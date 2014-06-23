@@ -20,10 +20,10 @@ import Graphics.Gloss.Interface.Pure.Game
 import System.Random (randomRs, newStdGen)
 
 -- Pure data type for representing the game state
-data LGradeAustrian = S1 | U2 | B3 | G4 | N5
-instance Grade LGradeAustrian
+data LGAustrian = S1 | U2 | B3 | G4 | N5
+-- instance Grade LGradeAustrian
 
--- data LGrade = S1 | U2 | B3 | G4 | N5 | G String
+data LGrade = AT LGAustrian | G String
 data LType = VO | VU | UE | PR | SE | T String
 
 -- Stores the subjects added so far.
@@ -61,6 +61,9 @@ makeLenses ''LState
 
 instance Show LGrade where
 	show (G s)	= s
+	show (AT x)	= show x
+
+instance Show LGAustrian where
 	show S1		= "1"
 	show U2		= "2"
 	show B3		= "3"
@@ -128,11 +131,11 @@ promptGrade :: IO LGrade
 promptGrade = do
 	gString <- promptLine "Grade (1,2,3,4,5, [..]): "
 	case gString of
-		"1" -> return S1
-		"2" -> return U2
-		"3" -> return B3
-		"4" -> return G4
-		"5" -> return N5
+		"1" -> return (AT S1)
+		"2" -> return (AT U2)
+		"3" -> return (AT B3)
+		"4" -> return (AT G4)
+		"5" -> return (AT N5)
 		_ 	-> return $G gString
 		
 readSubject :: IO LSubject
@@ -228,7 +231,7 @@ bla x = (1,x)
 
 
 
-e3 = addResult (createResult (10,12,2013) S1 "Pfeiler")(createSubject (6,1) ("E Physik 3",VO) )
-e4 = addResult (createResult (19,02,2014) G4 "Pfeiler")(createSubject (6,1) ("E Physik 4",VO) )
-cp = addResult (createResult (26,03,2014) S1 "Neumann")(createSubject (5,1) ("Comp. Physics",VO))
+e3 = addResult (createResult (10,12,2013) (AT S1) "Pfeiler")(createSubject (6,1) ("E Physik 3",VO) )
+e4 = addResult (createResult (19,02,2014) (AT G4) "Pfeiler")(createSubject (6,1) ("E Physik 4",VO) )
+cp = addResult (createResult (26,03,2014) (AT S1) "Neumann")(createSubject (5,1) ("Comp. Physics",VO))
 stat = createSubject (3,1) ("Statistik",VO)
