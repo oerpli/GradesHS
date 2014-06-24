@@ -10,8 +10,9 @@ import Data.Maybe
 import Data.Aeson
 import Data.Time
 import Data.Default
+import Data.Char
 -- import Data.Text
-import Data.Map
+-- import Data.Map
 import Data.Set (Set, member, empty, insert, delete)
 
 import Graphics.Gloss
@@ -77,6 +78,7 @@ instance Show LType where
 	show VO		= "VO"
 	show VU		= "VU"
 	show PR		= "PR"
+
 instance Show LSubject where
 	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.abbr) ++ "\t(" ++ show (s^.ects) ++ ")"
 		++  maybe "" ((":\t" ++) . show) (s^.result) where
@@ -118,14 +120,16 @@ promptLine prompt = do
 
 promptType :: IO LType
 promptType = do
-	tString <- promptLine "Type (VO|VU|SE|UE|PR|[..]): "
-	case tString of
+	tString <- promptLine "Type (VO|VU|SE|UE|PR): "
+	case (map toUpper tString) of
 		"VO"-> return VO
 		"VU"-> return VU
 		"SE"-> return SE
 		"UE"-> return UE
 		"PR"-> return PR
-		_	-> return $T tString
+		_	-> promptType
+		-- _	-> return $T tString
+		
 
 promptGrade :: IO LGrade
 promptGrade = do
@@ -168,69 +172,64 @@ readResult = do
 	-- putStrLn "Hello World"
 
 list :: Show a => [a] -> IO [a]
-list x = list' 0 x where
+list x = list' 1 x where
 	list' _ [] = return x
-	list' i (x:xs) = (putStrLn $ (show i) ++ "." ++ (show x)) >> list' (succ i) xs
-
+	list' i (x:xs) = (putStrLn $ (show i) ++ ".) " ++ (show x)) >> list' (succ i) xs
 	
 readIndex :: IO Int
 readIndex = do
 	ind <- promptLine "Enter Index: "
-	return $ read ind
-
-sInd :: [a] -> Int -> (Maybe a)
-sInd x i = if i < 0 || i >= (length x) then Nothing else Just (x !! i)
+	return $ (read ind) -1
 
 pickFromList :: [LSubject] -> IO (Maybe LSubject)
 pickFromList x = do
 	list x
 	ind <- readIndex 
-	return  $ sInd x ind
+	return $ listToMaybe $ x ^.. ix ind
 	
+modifyList :: [LSubject] -> IO [LSubject]
+modifyList x = do
+	s <- promptLine "add | res | rem: "
+	case map toLower s of
+		"add"	-> readSubject	>>= (\n -> return (x++[n]))
+		"res"	-> do
+					list x
+					ind <- readIndex
+					res <- readResult
+					return $ x & ix ind . result .~ Just res
+		"rem"	-> do
+					s2 <- promptLine "sub | res: "
+					list x
+					ind <- readIndex
+					case map toLower s2 of
+						"sub"	-> let (ys,zs) = splitAt ind x   in return (ys ++ (tail zs))
+						"res"	-> return $ x & ix ind . result .~ Nothing
+		""		-> return x
+		_		-> modifyList x
 
 
 runCmd :: [LSubject] -> IO [LSubject]
 runCmd x = do
-	s <- promptLine "list | add: "
-	case s of
-		"list"	-> list x
-		"add"	-> do
-			new	<- readSubject
-			return (new : x)
-		-- "avg"	-> do
-			-- avg <- calcAvg x
-			-- putStrLn $ show avg
-			-- return x
-	
-main = do
-	run []
-	return ()
+	s <- promptLine "list | mod: "
+	case map toLower s of
+		"list"	-> list x >> runCmd x
+		"mod"	-> modifyList x >>= runCmd
+		"" 		-> return x
+		_		-> runCmd x
+			
 
-run :: [LSubject] -> IO [LSubject]
-run x = do
-	new <- runCmd x
-	run new
+main :: IO()		
+main = run [cp,e3,e4,stat] where
+	run :: [LSubject] -> IO ()
+	run x = do
+		n <- runCmd x
+		x <- promptLine "Exit? Y | N: "
+		case map toLower x of
+			"n" -> run n
+			_	-> return ()
 	
 
---match string - if it is a known command execute and return modified state.
-modifyState :: State [LSubject] () -> String -> State [LSubject] ()
-modifyState s cmd = s
-
-
-push :: LSubject -> State [LSubject] ()
-push x = state (\xs ->  ((), x:xs))
-
-pop :: State [LSubject] LSubject
-pop = state (\(x:xs) -> (x, xs))
-
-push':: Int -> State [Int] ()
-push' x = state (\xs -> ((), x:xs))
-
-bla :: [LSubject] -> (Int,[LSubject])
-bla x = (1,x)
-
-
-
+-- Testdaten
 e3 = addResult (createResult (10,12,2013) (AT S1) "Pfeiler")(createSubject (6,1) ("E Physik 3",VO) )
 e4 = addResult (createResult (19,02,2014) (AT G4) "Pfeiler")(createSubject (6,1) ("E Physik 4",VO) )
 cp = addResult (createResult (26,03,2014) (AT S1) "Neumann")(createSubject (5,1) ("Comp. Physics",VO))
