@@ -10,13 +10,13 @@ It usually says what commands are possible.
 
 Here's a short overview:
 
-- list: Lists all subjects added so far
-- mod:  Modify subjects
-  - add:  Add new subject
-  - res:  Add result to existing subject
-  - rem:  Remove someting
-    - sub:  Remove subject
-    - res:  Remove result
+- `list`: Lists all subjects added so far
+- `mod`:  Modify subjects
+  - `add`:  Add new subject
+  - `res`:  Add result to existing subject
+  - `rem`:  Remove someting
+    - `sub`:  Remove subject
+    - `res`:  Remove result
 
 ### Planned:
 - different averaging techniques.
