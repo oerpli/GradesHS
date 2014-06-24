@@ -10,9 +10,10 @@ import Data.Maybe
 import Data.Aeson
 import Data.Time
 import Data.Default
+import Data.List
 import Data.Char
 -- import Data.Text
--- import Data.Map
+import qualified Data.Map.Strict as Map
 import Data.Set (Set, member, empty, insert, delete)
 
 import Graphics.Gloss
@@ -20,11 +21,14 @@ import Graphics.Gloss.Interface.Pure.Game
 
 import System.Random (randomRs, newStdGen)
 
+-- Different average calculations
+data LAvg = SWS | ECTS | UW deriving (Eq,Ord)
+
 -- Pure data type for representing the game state
-data LGAustrian = S1 | U2 | B3 | G4 | N5
+data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
 -- instance Grade LGradeAustrian
 
-data LGrade = AT LGAustrian | G String
+data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
 data LType = VO | VU | UE | PR | SE | T String
 
 -- Stores the subjects added so far.
@@ -34,8 +38,8 @@ data LState = LState
 
 -- 1 Subject. Curriculum is made of this thing. Added grades to do stuff.
 data LSubject = Subject
-	{ _ects 	:: Float			-- Credits
-	, _sws		:: Float			-- Hours/Week
+	{ _ects 	:: Double			-- Credits
+	, _sws		:: Double			-- Hours/Week
 	, _abbr		:: String			-- e.g. "E3" for "Einführung in die Physik 3"
 -- 	, _name		:: Maybe String		-- "Einführung in die Physik 3"
 	, _ltype 	:: LType
@@ -70,7 +74,7 @@ instance Show LGAustrian where
 	show B3		= "3"
 	show G4		= "4"
 	show N5		= "5"
-	
+
 instance Show LType where
 	show (T s)	= s
 	show SE		= "SE"
@@ -91,9 +95,7 @@ instance Show LResult where
 fillTo :: Int -> String -> String
 fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
 	
-	
-	
-createSubject :: (Float, Float) -> (String, LType) -> LSubject
+createSubject :: (Double, Double) -> (String, LType) -> LSubject
 createSubject (e,s) (a,t)  = def 
 	& ects	.~ e
 	& sws	.~ s
@@ -106,8 +108,28 @@ createResult (d,m,y) g p = def
 	& grade	.~ g
 	& prof	.~ p
 
-calcAvg :: [LSubject] -> [LGrade]
-calcAvg x = (catMaybes $ x ^.. traversed.result)^.. traversed.grade
+gradesDouble :: Map.Map LGrade Double
+gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
+
+avg :: LAvg -> [LSubject] -> Double
+avg wi x  = sumgrades/sumweight  where
+	y = filterGraded x			-- filter out ungraded subjects
+	weights = case wi of		-- get weights of subjects according to wi (Weight Identifier)
+		ECTS-> y^..traversed.ects
+		SWS -> y^..traversed.sws
+		UW	-> replicate (length y) 1.0
+	getgrades z = (catMaybes $ (z ^.. traversed.result))^.. traversed.grade -- gets grades from subjects
+	gradesdouble = map (\x -> Map.lookup x gradesDouble) (getgrades y)	-- looks up double value of grades
+	filtered = [(z,y)|(x,y)<-zip gradesdouble weights,(Just z) <- [x],isJust x] -- filters out grades without double
+	sumweight = sum $ map (\(_,y) -> y) filtered
+	sumgrades = sum $ map (\(x,y) -> x*y) filtered
+
+
+
+
+filterGraded :: [LSubject] -> [LSubject]
+filterGraded x = filter (\e -> isJust $ e ^. result) x
+
 
 addResult :: LResult -> LSubject -> LSubject
 addResult r s = s & result .~ Just r
@@ -230,7 +252,9 @@ main = run [cp,e3,e4,stat] where
 	
 
 -- Testdaten
+so = addResult (createResult (10,12,2013) (G "+") "Krexner")(createSubject (2,1) ("Sophomore",SE) )
 e3 = addResult (createResult (10,12,2013) (AT S1) "Pfeiler")(createSubject (6,1) ("E Physik 3",VO) )
 e4 = addResult (createResult (19,02,2014) (AT G4) "Pfeiler")(createSubject (6,1) ("E Physik 4",VO) )
 cp = addResult (createResult (26,03,2014) (AT S1) "Neumann")(createSubject (5,1) ("Comp. Physics",VO))
 stat = createSubject (3,1) ("Statistik",VO)
+std = [cp,e3,e4,stat,so]
