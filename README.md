@@ -4,7 +4,7 @@ GradesHS
 Tool for tracking your grades.
 
 
-## Usage
+### Usage
 Compile it or run `main :: IO()` from ghci.
 It usually says what commands are possible.
 
@@ -18,7 +18,7 @@ Here's a short overview:
     - sub:  Remove subject
     - res:  Remove result
 
-Planned:
+### Planned:
 - different averaging techniques.
 - kinda international (at least modular) grade support
 - advanced statistics.
