@@ -11,11 +11,10 @@ import Data.Char
 import qualified Data.Map.Strict as Map
 -- import Data.Set (Set, member, empty, insert, delete)
 
-
+import Text.Printf
 import Control.Concurrent (threadDelay)
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core hiding (delete)
-
 import qualified GHC.Read as R
 import qualified Text.Read.Lex as L
 import Text.ParserCombinators.ReadPrec
@@ -34,7 +33,7 @@ data LType = VO | VU | UE | PR | SE | T String
 
 
 
-data LAvg = SWS | ECTS | UW | NP LAvg deriving (Eq,Ord) 		-- Different average calculations
+data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord) 		-- Different average calculations
 data LStatus = Todo | Pos | Neg deriving (Eq)					-- Different subject stati
 data LAction = 	RemSub Int	-- remove subject with index 		--Available actions from the interface
 			|	RemRes Int	-- remove result from subject with index
@@ -166,7 +165,7 @@ gradesDouble :: Map.Map LGrade Double
 gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
 
 avg :: LAvg -> [LSubject] -> Double
-avg (NP w) x = avg w [s | s <- x, toStatus s == Pos] -- in this case only avg of positive subjects will be considered
+avg (NN w) x = avg w [s | s <- x, toStatus s == Pos] -- in this case only avg of positive subjects will be considered
 avg wi x  = sumgrades/sumweight  where
 	y = filterGraded x			-- filter out ungraded subjects
 	weights = case wi of		-- get weights of subjects according to wi (Weight Identifier)
@@ -178,6 +177,9 @@ avg wi x  = sumgrades/sumweight  where
 	filtered = [(z,y)|(x,y)<-zip gradesdouble weights,(Just z) <- [x],isJust x] -- filters out grades without double
 	sumweight = sum $ map (\(_,y) -> y) filtered
 	sumgrades = sum $ map (\(x,y) -> x*y) filtered
+	
+filterStatus :: LStatus -> [LSubject] -> ([LSubject] -> b) -> b
+filterStatus status s f = f [x | x <- s, toStatus x == status]
 
 
 filterGraded :: [LSubject] -> [LSubject]
@@ -308,7 +310,7 @@ setup s w = void $ do
     return w UI.# set title "Grades.HS"
     UI.addStyleSheet w "concept.css"
     buttons <- mkButtons'
-    getBody w	#+ [UI.div	#. "wrap"	#+ [header,mkSubjects s]]
+    getBody w	#+ [UI.div	#. "wrap"	#+ [header,mkSubjects s, mkStats s]]
 
 header :: UI Element
 header = UI.h1  #+ [string "Grades.HS"]
@@ -330,11 +332,30 @@ mkSubject index subj = do
 	return outer
 	
 mkSubjects :: [LSubject] -> UI Element
-mkSubjects s = UI.div #. "subjects"  #+ (iterateWithIndex 0 mkSubject s) where 
+mkSubjects s = UI.div #. "subjects"  #+ (
+		[UI.h2 UI.# set text "Subjects"] 
+		++(iterateWithIndex 0 mkSubject s)) where 
 	iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
 	iterateWithIndex _ _ [] = []
 	iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
-
+	
+mkStats :: [LSubject] -> UI Element
+mkStats s = UI.div #. "stats" #+
+		(	UI.h2 UI.# set text "Statistics"
+		: 	UI.div #. "statwrap" #+ stats :[]) where
+			stats = map formatStat 
+					[	("Positive ECTS:", printf "%.2f\n" . sum $ filterStatus Pos s (^.. traversed . ects))
+					,	("ECTS avg:", printf "%.2f\n" $ avg ECTS s)
+					,	("ECTS avg (only positive):", printf "%.2f\n" $ avg (NN ECTS) s)
+					,	(def,def)
+					,	("Subjects:", show . length $ s)
+					,	("Positive subjects:", show . length $ filterStatus Pos s (id))
+					,	("Negative subjects:", show . length $ filterStatus Neg s (id))
+					]
+			
+formatStat :: (String,String) -> UI Element
+formatStat (l,v) = UI.div #. "statline" #+ [UI.span #. "label" UI.# set text l, UI.span #. "value" UI.# set text v]
+		
 
 mkButtons :: Int -> LSubject -> UI (Element, Element)
 mkButtons i s = do

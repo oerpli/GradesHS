@@ -1,13 +1,34 @@
-.wrap {
+.wrap ,.statline,.subject{
 	position: relative;
 }
 
+.name,.ects,.type,.grade,.sb1,.sb2,.prof,.date,.subjects,.stats ,.label,.value{
+	position: absolute;
+}
 
-.subject {
+.stats{
+	left: 400px;
+}
+
+.statline{
+	height: 20px;
+	width: 350px;
+}
+
+.label,{
+	width: 100px;
+}
+.label{
+	left: 0px;
+}
+.value{
+	right: 50px;
+}
+
+.subject{
 	margin: 3px;
 	width: 350px;
 	height: 35px;
-	position: relative;
 }
 .pos {
 	background: #A2CD5A;
@@ -28,9 +49,7 @@
 	max-height: 18px;
 }
 
-.name,.ects,.type,.grade,.sb1,.sb2,.prof,.date{
-	position: absolute;
-}
+
 
 .grade {
 	margin: 5px;
