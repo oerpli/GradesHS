@@ -16,12 +16,20 @@ import Control.Concurrent (threadDelay)
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core hiding (delete)
 
+import qualified GHC.Read as R
+import qualified Text.Read.Lex as L
+import Text.ParserCombinators.ReadPrec
+import qualified Text.ParserCombinators.ReadP as P
 
+import Debug.Trace
 
+import Text.ParserCombinators.ReadP
+  ( ReadS
+  , readP_to_S
+  )
 
 -- Different average calculations
 data LAvg = SWS | ECTS | UW deriving (Eq,Ord)
-
 -- Pure data type for representing the game state
 data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
 -- instance Grade LGradeAustrian
@@ -29,14 +37,9 @@ data LStatus = Todo | Pos | Neg deriving (Eq)
 
 data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
 
-toStatus :: LGrade -> LStatus
-toStatus (G "") = Todo
-toStatus (G _)	= Pos
-toStatus (AT g) = toStatusAT g
+class  Status a  where
+	toStatus :: a -> LStatus
 
-toStatusAT :: LGAustrian -> LStatus
-toStatusAT N5	= Neg
-toStatusAT _	= Pos
 
 data LType = VO | VU | UE | PR | SE | T String
 
@@ -74,6 +77,19 @@ makeClassy ''LResult
 makeClassy ''LSubject
 makeLenses ''LState
 
+instance Status LSubject where
+	toStatus s = maybe Todo (toStatus . (^.grade)) (s^.result)
+	
+instance Status LGrade where
+	toStatus (G "") = Todo
+	toStatus (G _)	= Pos
+	toStatus (AT g) = toStatus g
+
+instance Status LGAustrian where
+	toStatus N5 = Neg
+	toStatus _ 	= Pos
+	
+
 instance Show LGrade where
 	show (G s)	= s
 	show (AT x)	= show x
@@ -107,7 +123,30 @@ instance Show LSubject where
 instance Show LResult where
 	show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
 
-	
+instance Read LGrade where
+  readPrec =
+    R.parens
+    ( do L.Ident s <- R.lexP
+         case s of
+			"G1"-> return (AT S1)
+			"G2"-> return (AT U2)
+			"G3"-> return (AT B3)
+			"G4"-> return (AT G4)
+			"G5"-> return (AT N5)
+			_	-> return (G (tail s))
+    )
+  -- readListPrec = R.readListPrecDefault
+  -- readList     = R.readListDefault
+  
+-- readGrade :: String -> LGrade
+-- readGrade s = case s of
+		-- "1" -> (AT S1)
+		-- "2" -> (AT U2)
+		-- "3" -> (AT B3)
+		-- "4" -> (AT G4)
+		-- "5" -> (AT N5)
+		-- _ 	-> (G s)
+
 fillTo :: Int -> String -> String
 fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
 
@@ -123,6 +162,9 @@ createResult (d,m,y) g p = def
 	& date	.~ fromGregorian y m d
 	& grade	.~ g
 	& prof	.~ p
+	
+createResult' :: (String,String,String) -> String -> String -> LResult
+createResult' (d,m,y) g p = createResult (read d, read m,read y) (read ('G' :g)) p
 
 gradesDouble :: Map.Map LGrade Double
 gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
@@ -167,19 +209,7 @@ promptType = do
 		"PR"-> return PR
 		_	-> promptType
 		-- _	-> return $T tString
-		
 
-promptGrade :: IO LGrade
-promptGrade = do
-	gString <- promptLine "Grade (1,2,3,4,5, [..]): "
-	case gString of
-		"1" -> return (AT S1)
-		"2" -> return (AT U2)
-		"3" -> return (AT B3)
-		"4" -> return (AT G4)
-		"5" -> return (AT N5)
-		_ 	-> return $G gString
-		
 readSubject :: IO LSubject
 readSubject = do 
 	ec	<- promptLine "ECTS (Float): "
@@ -194,8 +224,8 @@ readResult = do
 	m <- promptLine "Month (Int): "
 	y <- promptLine "Year (Integer): "
 	p <- promptLine "Prof (String): "
-	g <- promptGrade
-	return (createResult (read d, read m, read y) g p)
+	g <- promptLine "Grade (1,2,3,4,5, [..]): "
+	return (createResult' (d, m, y) g p)
 	
 list :: Show a => [a] -> IO ()
 list x = list' 1 x where
@@ -211,7 +241,7 @@ pickFromList :: [LSubject] -> IO (Maybe LSubject)
 pickFromList x = do
 	list x
 	ind <- readIndex 
-	return $ listToMaybe $ x ^.. ix ind
+	return $ pickFromList' x ind
 	
 modifyList :: [LSubject] -> IO [LSubject]
 modifyList x = do
@@ -222,16 +252,28 @@ modifyList x = do
 					list x
 					ind <- readIndex
 					res <- readResult
-					return $ x & ix ind . result .~ Just res
+					return $ modifyListResult x ind res
 		"rem"	-> do
 					s2 <- promptLine "sub | res: "
 					list x
 					ind <- readIndex
 					case map toLower s2 of
-						"sub"	-> let (ys,zs) = splitAt ind x   in return (ys ++ (tail zs))
-						"res"	-> return $ x & ix ind . result .~ Nothing
+						"sub"	-> return $ modifyListRemoveSubject x ind
+						"res"	-> return $ modifyListRemoveResult x ind
 		""		-> return x
 		_		-> modifyList x
+
+pickFromList' :: [LSubject] -> Int -> (Maybe LSubject)
+pickFromList' s i = listToMaybe $ s ^.. ix i
+		
+modifyListResult :: [LSubject] -> Int -> LResult -> [LSubject]
+modifyListResult s i r = s & ix i . result .~ Just r
+
+modifyListRemoveResult :: [LSubject] -> Int -> [LSubject]
+modifyListRemoveResult s i = s & ix i . result .~ Nothing
+
+modifyListRemoveSubject :: [LSubject] -> Int -> [LSubject]
+modifyListRemoveSubject s i = ys ++ (tail zs) where	(ys,zs) = splitAt i s
 
 
 runCmd :: [LSubject] -> IO [LSubject]
@@ -279,7 +321,7 @@ std = [cp,e3,e4,stat,so,cp2]
 -- ÖÖHÖHÖH
 
 subjClasses :: LSubject -> String
-subjClasses g = "subject " ++ show (toStatus (maybe def (^.grade) (g ^. result)))
+subjClasses g = "subject " ++ show (toStatus g)
 
 main :: IO ()
 main = do
@@ -290,7 +332,7 @@ main = do
 
 setup :: Window -> UI ()
 setup w = void $ do
-    return w UI.# set title "GradesHS"
+    return w UI.# set title "Grades.HS"
     UI.addStyleSheet w "concept.css"
     buttons <- mkButtons
     getBody w #+
@@ -317,6 +359,8 @@ mkSubject subj = do
 		,	UI.div	#.	"prof"	#+ [string $ maybe def (^.prof) (subj ^. result)]	
 		]
 	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [brem,bres,etitle,egrade,eexam]
+	on UI.click brem $ \_ -> do
+		UI.element outer #+ [UI.div UI.# set html "<b>HIHIHIHI</>"]
 	return outer
 	
 mkSubjects :: [LSubject] -> UI Element
