@@ -10,9 +10,19 @@
 	left: 400px;
 }
 
+.statwrap{
+	overflow:hidden;
+	width: 300px;
+}
+
 .statline{
 	height: 20px;
-	width: 350px;
+	width: 300px;
+}
+.h5 {
+	font-weight: bold;
+	height: 25px;
+	
 }
 
 .label,{
@@ -22,7 +32,7 @@
 	left: 0px;
 }
 .value{
-	right: 50px;
+	right: 0px;
 }
 
 .subject{

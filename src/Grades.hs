@@ -178,8 +178,8 @@ avg wi x  = sumgrades/sumweight  where
 	sumweight = sum $ map (\(_,y) -> y) filtered
 	sumgrades = sum $ map (\(x,y) -> x*y) filtered
 	
-filterStatus :: LStatus -> [LSubject] -> ([LSubject] -> b) -> b
-filterStatus status s f = f [x | x <- s, toStatus x == status]
+filterStatus :: [LStatus] -> [LSubject] -> ([LSubject] -> b) -> b
+filterStatus status s f = f [x | x <- s, elem (toStatus x) status]
 
 
 filterGraded :: [LSubject] -> [LSubject]
@@ -343,18 +343,29 @@ mkStats :: [LSubject] -> UI Element
 mkStats s = UI.div #. "stats" #+
 		(	UI.h2 UI.# set text "Statistics"
 		: 	UI.div #. "statwrap" #+ stats :[]) where
+			emptyline = 	(replicate 38 '_',def)
+			f1d = printf "%.1f"
+			f2d = printf "%.2f"
 			stats = map formatStat 
-					[	("Positive ECTS:", printf "%.2f\n" . sum $ filterStatus Pos s (^.. traversed . ects))
-					,	("ECTS avg:", printf "%.2f\n" $ avg ECTS s)
-					,	("ECTS avg (only positive):", printf "%.2f\n" $ avg (NN ECTS) s)
-					,	(def,def)
-					,	("Subjects:", show . length $ s)
-					,	("Positive subjects:", show . length $ filterStatus Pos s (id))
-					,	("Negative subjects:", show . length $ filterStatus Neg s (id))
+					[	("ECTS",def)
+					,	("Total:", f1d . sum $ s^.. traversed . ects)
+					,	("Positive:", f1d . sum $ filterStatus [Pos] s (^.. traversed . ects))
+					,	("Remaining:", f1d . sum $ filterStatus [Neg,Todo] s (^.. traversed . ects))
+					-- ,	emptyline
+					,	("Averages",def)
+					,	("ECTS:", f2d $ avg ECTS s)
+					,	("ECTS (positive):", f2d $ avg (NN ECTS) s)
+					,	("Unweighted:", f2d $ avg UW s)
+					,	("Unweighted (positive):", f2d $ avg (NN UW) s)
+					-- ,	emptyline
+					,	("Subjects",def)
+					,	("Total:", show . length $ s)
+					,	("Positive:", show . length $ filterStatus [Pos] s (id))
+					,	("Negative:", show . length $ filterStatus [Neg] s (id))
 					]
 			
 formatStat :: (String,String) -> UI Element
-formatStat (l,v) = UI.div #. "statline" #+ [UI.span #. "label" UI.# set text l, UI.span #. "value" UI.# set text v]
+formatStat (l,v) = UI.div #. "statline" #+ [UI.span #. ("label" ++ (if v==def then " h5" else [])) UI.# set text l, UI.span #. "value" UI.# set text v]
 		
 
 mkButtons :: Int -> LSubject -> UI (Element, Element)
