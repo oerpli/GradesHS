@@ -1,25 +1,23 @@
-{-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction #-}
-module GradesHS where
+﻿{-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction, RecursiveDo #-}
+-- module GradesHS where
 
--- import Control.Applicative ((<$>), (<*>))
-import Control.Lens
--- import Control.Monad.State (State, execState, get)
-import Control.Monad.State
-import Control.Monad (when)
+import Control.Lens hiding (set)
+import Control.Monad (when,void)
+
 import Data.Maybe
-import Data.Aeson
 import Data.Time
 import Data.Default
-import Data.List
 import Data.Char
--- import Data.Text
 import qualified Data.Map.Strict as Map
-import Data.Set (Set, member, empty, insert, delete)
+-- import Data.Set (Set, member, empty, insert, delete)
 
-import Graphics.Gloss
-import Graphics.Gloss.Interface.Pure.Game
 
-import System.Random (randomRs, newStdGen)
+import Control.Concurrent (threadDelay)
+import qualified Graphics.UI.Threepenny as UI
+import Graphics.UI.Threepenny.Core hiding (delete)
+
+
+
 
 -- Different average calculations
 data LAvg = SWS | ECTS | UW deriving (Eq,Ord)
@@ -27,8 +25,19 @@ data LAvg = SWS | ECTS | UW deriving (Eq,Ord)
 -- Pure data type for representing the game state
 data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
 -- instance Grade LGradeAustrian
+data LStatus = Todo | Pos | Neg deriving (Eq)
 
 data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
+
+toStatus :: LGrade -> LStatus
+toStatus (G "") = Todo
+toStatus (G _)	= Pos
+toStatus (AT g) = toStatusAT g
+
+toStatusAT :: LGAustrian -> LStatus
+toStatusAT N5	= Neg
+toStatusAT _	= Pos
+
 data LType = VO | VU | UE | PR | SE | T String
 
 -- Stores the subjects added so far.
@@ -40,8 +49,7 @@ data LState = LState
 data LSubject = Subject
 	{ _ects 	:: Double			-- Credits
 	, _sws		:: Double			-- Hours/Week
-	, _abbr		:: String			-- e.g. "E3" for "Einführung in die Physik 3"
--- 	, _name		:: Maybe String		-- "Einführung in die Physik 3"
+	, _name		:: String			-- "Einführung in die Physik 3"
 	, _ltype 	:: LType
 	, _result	:: Maybe LResult	-- last try 
 	} 
@@ -59,6 +67,8 @@ instance Default LResult where
 	def = Result (fromGregorian 0 0 0) (G "") ""
 instance Default LSubject where
 	def = Subject 0 0 "" (T "") Nothing
+instance Default LGrade where
+	def = G ""
 
 makeClassy ''LResult
 makeClassy ''LSubject
@@ -67,6 +77,11 @@ makeLenses ''LState
 instance Show LGrade where
 	show (G s)	= s
 	show (AT x)	= show x
+
+instance Show LStatus where
+	show Pos = "pos"
+	show Neg = "neg"
+	show Todo= "todo"
 
 instance Show LGAustrian where
 	show S1		= "1"
@@ -84,7 +99,7 @@ instance Show LType where
 	show PR		= "PR"
 
 instance Show LSubject where
-	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.abbr) ++ "\t(" ++ show (s^.ects) ++ ")"
+	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.name) ++ "\t(" ++ show (s^.ects) ++ ")"
 		++  maybe "" ((":\t" ++) . show) (s^.result) where
 		fillTo :: Int -> String -> String
 		fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
@@ -92,14 +107,15 @@ instance Show LSubject where
 instance Show LResult where
 	show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
 
+	
 fillTo :: Int -> String -> String
 fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
-	
-createSubject :: (Double, Double) -> (String, LType) -> LSubject
-createSubject (e,s) (a,t)  = def 
+
+createSubject :: Double -> Double -> String -> LType -> LSubject
+createSubject e s n t  = def 
 	& ects	.~ e
 	& sws	.~ s
-	& abbr	.~ a
+	& name	.~ n
 	& ltype	.~ t
 
 createResult :: (Int,Int, Integer) -> LGrade -> String -> LResult
@@ -170,7 +186,7 @@ readSubject = do
 	sw	<- promptLine "SWS (Float): "
 	ab	<- promptLine "Name (String): "
 	t	<- promptType
-	return (createSubject (read ec,read sw) (ab,t))
+	return $ createSubject (read ec) (read sw) ab t
 	
 readResult :: IO LResult
 readResult = do
@@ -181,21 +197,9 @@ readResult = do
 	g <- promptGrade
 	return (createResult (read d, read m, read y) g p)
 	
--- main :: IO()
--- main = do
-	-- sub <- readSubject
-	-- res <- readResult
-	-- let subj = addResult def def
-	-- putStrLn $ show subj
-	-- putStrLn $ show e3
-	-- putStrLn $ show e4
-	-- putStrLn $ show stat
-	-- putStrLn $ show cp
-	-- putStrLn "Hello World"
-
-list :: Show a => [a] -> IO [a]
+list :: Show a => [a] -> IO ()
 list x = list' 1 x where
-	list' _ [] = return x
+	list' _ [] = return ()
 	list' i (x:xs) = (putStrLn $ (show i) ++ ".) " ++ (show x)) >> list' (succ i) xs
 	
 readIndex :: IO Int
@@ -239,22 +243,108 @@ runCmd x = do
 		"" 		-> return x
 		_		-> runCmd x
 			
+run :: [LSubject] -> IO ()
+run x = do
+	n <- runCmd x
+	x <- promptLine "Exit? Y | N: "
+	case map toLower x of
+		"n" -> run n
+		_	-> return ()		
+			
 
-main :: IO()		
-main = run [cp,e3,e4,stat] where
-	run :: [LSubject] -> IO ()
-	run x = do
-		n <- runCmd x
-		x <- promptLine "Exit? Y | N: "
-		case map toLower x of
-			"n" -> run n
-			_	-> return ()
+runconsole = run [cp,e3,e4,stat]
+-- Testdaten
+so = addResult (createResult (10,12,2013) (G "+") "Krexner")(createSubject 2 1 "Sophomore" SE) 
+e3 = addResult (createResult (10,12,2013) (AT S1) "Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik III" VO) 
+e4 = addResult (createResult (19,02,2014) (AT G4) "Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik IV" VO) 
+cp = addResult (createResult (26,03,2014) (AT S1) "Neumann")(createSubject 5 1 "Computational Physics" VO)
+cp2 = (createSubject 5 1 "Computational Physics II" VO)
+stat = addResult (createResult (3,03,2014) (AT N5) "Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
+std = [cp,e3,e4,stat,so,cp2]
+
+
+
+-- Subject Widget
+
+-- subject :: Behavior (Maybe LSubject) -> UI ((Element,Element),Tidings LSubject)
+-- subject bsub = do
+	-- entry1 <- UI.entry $ fst . maybe ("","") id <$> bsub
+	-- entry2 <- UI.entry $ snd . maybe ("","") id <$> bsub
+	
+	-- return ((getElement entry1, getElement entry2),(,) <$> UI.userText entry1 <*> UI.userText entry2)
+	
+	
+	
+	
+-- ÖÖHÖHÖH
+
+subjClasses :: LSubject -> String
+subjClasses g = "subject " ++ show (toStatus (maybe def (^.grade) (g ^. result)))
+
+main :: IO ()
+main = do
+	startGUI defaultConfig { tpStatic = Just "./" } setup
+
+	return ()
 	
 
--- Testdaten
-so = addResult (createResult (10,12,2013) (G "+") "Krexner")(createSubject (2,1) ("Sophomore",SE) )
-e3 = addResult (createResult (10,12,2013) (AT S1) "Pfeiler")(createSubject (6,1) ("E Physik 3",VO) )
-e4 = addResult (createResult (19,02,2014) (AT G4) "Pfeiler")(createSubject (6,1) ("E Physik 4",VO) )
-cp = addResult (createResult (26,03,2014) (AT S1) "Neumann")(createSubject (5,1) ("Comp. Physics",VO))
-stat = createSubject (3,1) ("Statistik",VO)
-std = [cp,e3,e4,stat,so]
+setup :: Window -> UI ()
+setup w = void $ do
+    return w UI.# set title "GradesHS"
+    UI.addStyleSheet w "concept.css"
+    buttons <- mkButtons
+    getBody w #+
+        [UI.div #. "wrap" #+ (header ++ map UI.element buttons)]
+
+header :: [UI Element]
+header =
+    [ UI.h1  #+ [string "Grades.HS"]
+	,  mkSubjects std
+	]
+
+mkSubject :: LSubject -> UI Element
+mkSubject subj = do
+	brem	<- UI.button#. "sb1"	#+ [string "-"]
+	bres	<- UI.button#. "sb2"	#+ [string "R"]
+	etitle	<- UI.div	#. "title"	#+
+		[	UI.div	#.	"ects"	#+ [string . show $ subj ^. ects]
+		,	UI.div #.	"type"	#+ [string . show $ subj ^. ltype]
+		,	UI.div #.	"name"	#+ [string $ subj ^. name]
+		]
+	egrade	<- UI.div	#. "grade" #+ [string . show $ maybe def (^.grade) (subj ^. result)]
+	eexam	<- UI.div	#. "exam"	#+
+		[	UI.div	#.	"date"	#+ [string $ maybe def (show .(^.date)) (subj ^. result)]
+		,	UI.div	#.	"prof"	#+ [string $ maybe def (^.prof) (subj ^. result)]	
+		]
+	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [brem,bres,etitle,egrade,eexam]
+	return outer
+	
+mkSubjects :: [LSubject] -> UI Element
+mkSubjects s = UI.div #. "subjects"  #+ (map mkSubject s)
+	
+mkButton :: String -> UI (Element, Element)
+mkButton title = do
+    button <- UI.button UI.#. "button" UI.#+ [string title]
+    view   <- UI.p #+ [UI.element button, string "xD"]
+    return (button, view)
+
+	
+mkButtons :: UI [Element]
+mkButtons = do
+    list    <- UI.ul #. "buttons-list"
+    
+    (button1, view1) <- mkButton button1Title
+    
+    on UI.hover button1 $ \_ -> do
+        UI.element button1 #+ [return button1]
+    on UI.leave button1 $ \_ -> do
+        UI.element button1 #+ []
+    on UI.click button1 $ \_ -> do
+        UI.element button1 UI.# set text (button1Title ++ " [pressed]")
+        liftIO $ threadDelay $ 1000 *  1
+        UI.element list    #+ [UI.li UI.# set html "<b>Delayed</b> result!"]
+    
+    return [list, view1]
+
+  where button1Title = "Click me, I delay a bit"
+        button2Title = "Click me, I work immediately"
