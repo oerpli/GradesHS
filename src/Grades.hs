@@ -67,7 +67,6 @@ createResult'' d g p = def
 	& grade	.~ g
 	& prof	.~ p
 	
-
 -- | Calculates the average of the provided subjects with the specified method
 avg :: LAvg -> [LSubject] -> Double
 avg (NN w) x = avg w [s | s <- x, toStatus s == Pos] -- in this case only avg of positive subjects will be considered
@@ -88,7 +87,6 @@ filterStatus status s f = f [x | x <- s, elem (toStatus x) status]
 
 filterGraded :: [LSubject] -> [LSubject]
 filterGraded x = filter (\e -> isJust $ e ^. result) x
-
 
 -- | Applies an action to a list of subjects and returns the modified list.
 applyAction :: LAction -> [LSubject]-> [LSubject]
@@ -121,7 +119,6 @@ setup s w = void $ do
 	io <- liftIO $ newIORef (catMaybes s)
 	view	<- mkView (w,io) s
 	getBody w	UI.# set UI.children [view]
-
 
 mkView :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
 mkView w s = do
