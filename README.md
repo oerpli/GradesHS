@@ -5,7 +5,8 @@ Tool for tracking your grades.
 
 
 ### Usage
-Compile and run `main :: IO ()` (or use the binary) and open `localhost:9999` in your browser
+Compile and run `main :: IO ()` (or use the binary) and open `localhost:9999` in your browser.
+The `css` folder should be in the same directory as the binary (if you want to change that behaviour you have to change it in the source).
 
 On the left side there are the currently tracked subjects - the list is initalized with default data - if you don't want to remove it every time change the source code or wait for the save update.
 
