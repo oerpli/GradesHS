@@ -3,14 +3,6 @@ import	Data.Time
 import	Data.Char (toUpper)
 import	Data.Default
 
-
--- for read implementation
--- import				Text.ParserCombinators.ReadP (ReadS, readP_to_S)
--- import qualified	GHC.Read as R
--- import qualified	Text.Read.Lex as L
--- -- import			Text.ParserCombinators.ReadPrec
--- -- import qualified	Text.ParserCombinators.ReadP as P
-
 data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
 data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
 data LType = VO | VU | UE | PR | SE | T String deriving (Eq)
@@ -49,6 +41,8 @@ data LResult = Result
 	, _prof		:: String	-- Examinant
 	} deriving (Eq)
 
+	
+{- internal stuff - should not be exposed to the user -}
 -- instance Show LResult where
 	-- show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
 
@@ -82,6 +76,7 @@ instance Show LType where
 	show VU		= "VU"
 	show PR		= "PR"
 
+-- | "cast" from string to wanted type
 class Read' a where
 	fromString' :: String -> a
 
@@ -111,8 +106,14 @@ instance Default LSubject where
 instance Default LGrade where
 	def = G ""
 
-
-
+	
+{- Read' is easier and less error prone -}
+-- for read implementation
+-- import				Text.ParserCombinators.ReadP (ReadS, readP_to_S)
+-- import qualified	GHC.Read as R
+-- import qualified	Text.Read.Lex as L
+-- -- import			Text.ParserCombinators.ReadPrec
+-- -- import qualified	Text.ParserCombinators.ReadP as P
 -- instance Read LGrade where
   -- readPrec =
     -- R.parens
