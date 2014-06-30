@@ -1,24 +1,28 @@
 {-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction, RecursiveDo #-}
 -- module GradesHS where
 
-import Control.Lens hiding (set)
-import Control.Monad (when,void)
+import				Control.Lens hiding (set)
+import				Control.Monad (when,void)
 
-import Data.Maybe
-import Data.Time
-import Data.Default
-import Data.Char
-import qualified Data.Map.Strict as Map
+import				Data.Maybe
+import				Data.Time
+import				Data.Default
+import				Data.Char
+import qualified	Data.Map.Strict as Map
 -- import Data.Set (Set, member, empty, insert, delete)
 
-import Text.Printf
-import Control.Concurrent (threadDelay)
-import qualified Graphics.UI.Threepenny as UI
-import Graphics.UI.Threepenny.Core hiding (delete)
-import qualified GHC.Read as R
-import qualified Text.Read.Lex as L
-import Text.ParserCombinators.ReadPrec
-import qualified Text.ParserCombinators.ReadP as P
+import				Text.Printf
+import				Control.Concurrent (threadDelay)
+import qualified	Graphics.UI.Threepenny as UI
+
+import 				Data.IORef
+import 				Control.Monad.Trans (liftIO)
+
+import 				Graphics.UI.Threepenny.Core hiding (delete)
+import qualified	GHC.Read as R
+import qualified	Text.Read.Lex as L
+import				Text.ParserCombinators.ReadPrec
+import qualified	Text.ParserCombinators.ReadP as P
 
 import Debug.Trace
 
@@ -188,101 +192,14 @@ filterGraded x = filter (\e -> isJust $ e ^. result) x
 
 addResult :: LResult -> LSubject -> LSubject
 addResult r s = s & result .~ Just r
+
+applyAction :: LAction -> [LSubject]-> [LSubject]
+applyAction (RemSub i) s 	= ys ++ (tail zs) where (ys,zs) = splitAt i s
+applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
+applyAction (AddSub n) s 	= s ++ [n]
+applyAction (AddRes i r) s 	= s & ix i . result .~ Just r
+applyAction _ s= s
 	
--- User input etc.
-promptLine :: String -> IO String
-promptLine prompt = do
-    putStr $ prompt
-    getLine
-
-promptType :: IO LType
-promptType = do
-	tString <- promptLine "Type (VO|VU|SE|UE|PR): "
-	case (map toUpper tString) of
-		"VO"-> return VO
-		"VU"-> return VU
-		"SE"-> return SE
-		"UE"-> return UE
-		"PR"-> return PR
-		_	-> promptType
-		-- _	-> return $T tString
-
-readSubject :: IO LSubject
-readSubject = do 
-	ec	<- promptLine "ECTS (Float): "
-	sw	<- promptLine "SWS (Float): "
-	ab	<- promptLine "Name (String): "
-	t	<- promptType
-	return $ createSubject (read ec) (read sw) ab t
-	
-readResult :: IO LResult
-readResult = do
-	d <- promptLine "Day (Int): "
-	m <- promptLine "Month (Int): "
-	y <- promptLine "Year (Integer): "
-	p <- promptLine "Prof (String): "
-	g <- promptLine "Grade (1,2,3,4,5, [..]): "
-	return (createResult' (d, m, y) g p)
-	
-list :: Show a => [a] -> IO ()
-list x = list' 1 x where
-	list' _ [] = return ()
-	list' i (x:xs) = (putStrLn $ (show i) ++ ".) " ++ (show x)) >> list' (succ i) xs
-	
-readIndex :: IO Int
-readIndex = do
-	ind <- promptLine "Enter Index: "
-	return $ (read ind) -1
-
-modifyList :: [LSubject] -> IO [LSubject]
-modifyList x = do
-	s <- promptLine "add | res | rem: "
-	case map toLower s of
-		"add"	-> do 
-					sub <- readSubject
-					return $ applyAction x (AddSub sub)
-		"res"	-> do
-					list x
-					ind <- readIndex
-					res <- readResult
-					return $ applyAction x (AddRes ind res)
-		"rem"	-> do
-					s2 <- promptLine "sub | res: "
-					list x
-					ind <- readIndex
-					case map toLower s2 of
-						"sub"	-> return $ applyAction x (RemSub ind)
-						"res"	-> return $ applyAction x (RemRes ind)
-		""		-> return x
-		_		-> modifyList x
-
-
-applyAction :: [LSubject] -> LAction -> [LSubject]
-applyAction s (RemSub i) 	= ys ++ (tail zs) where (ys,zs) = splitAt i s
-applyAction s (RemRes i) 	= s & ix i . result .~ Nothing
-applyAction s (AddSub n) 	= s ++ [n]
-applyAction s (AddRes i r)  	= s & ix i . result .~ Just r
-applyAction s _ = s
-
-runCmd :: [LSubject] -> IO [LSubject]
-runCmd x = do
-	s <- promptLine "list | mod: "
-	case map toLower s of
-		"list"	-> list x >> runCmd x
-		"mod"	-> modifyList x >>= runCmd
-		"" 		-> return x
-		_		-> runCmd x
-			
-run :: [LSubject] -> IO ()
-run x = do
-	n <- runCmd x
-	x <- promptLine "Exit? Y | N: "
-	case map toLower x of
-		"n" -> run n
-		_	-> return ()		
-			
-
-runconsole = run [cp,e3,e4,stat]
 -- Testdaten
 so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexner")(createSubject 2 1 "Sophomore" SE) 
 e3 = addResult (createResult (10,12,2013) (AT S1) "Prof. iR Dr. Wolfgang Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik III" VO) 
@@ -293,52 +210,94 @@ stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Vier
 std = [cp,e3,e4,stat,so,cp2]
 
 
--- GUI
-
-subjClasses :: LSubject -> String
-subjClasses g = "subject " ++ show (toStatus g)
-
+-- GUI (ugly code starts here)
 main :: IO ()
 main = do
 	startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
-
-	return ()
+	putStrLn "Ready"
 	
-
 setup :: [LSubject] -> Window -> UI ()
 setup s w = void $ do
-    return w UI.# set title "Grades.HS"
-    UI.addStyleSheet w "concept.css"
-    buttons <- mkButtons'
-    getBody w	#+ [UI.div	#. "wrap"	#+ [header,mkSubjects s, mkStats s]]
+	return w UI.# set title "Grades.HS"
+	UI.addStyleSheet w "concept.css"
+	
+	ioSubject <- liftIO $ newIORef s
+	(mv,buttons) <- mkView s
+	brem <- fst $ buttons !! 0
+	bres <- snd $ buttons !! 0
+	on UI.click brem $ \_ -> do
+		liftIO $ modifyIORef ioSubject (applyAction (RemSub 0))
+		rSubject <- liftIO $ readIORef ioSubject
+		(mv,buttons) <- mkView rSubject
+		getBody w	UI.# set UI.children mv
+		getBody w	#+ [return brem, return bres]
+	on UI.click bres $ \_ -> do
+		liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
+		rSubject <- liftIO $ readIORef ioSubject
+		(mv,buttons) <- mkView rSubject
+		getBody w	UI.# set UI.children mv
+		getBody w	#+ [return brem, return bres]
+	getBody w	#+ (map (UI.element) mv)
+	-- getBody w #+ 
 
 header :: UI Element
 header = UI.h1  #+ [string "Grades.HS"]
 
-mkSubject :: Int -> LSubject -> UI Element
-mkSubject index subj = do
-	(brem,bres)	<- mkButtons index subj
+mkView :: [LSubject] -> UI ([Element], [(UI Element, UI Element)])
+mkView s = do
+	-- xxxx <- trace "FUCKTHIS" (UI.div)
+	(subjs,buttons) <- mkSubjects s
+	m <- UI.div #. "main"
+	UI.element m #+	[header,return subjs, mkStats s]
+	return ([m],buttons)
+
+-- Generates subject list
+mkSubjects  :: [LSubject] -> UI (Element, [(UI Element, UI Element)])
+mkSubjects s = do
+	out <- UI.div #. "subjects"
+	let (z,buttons) = mkS s
+	let subjects = [UI.h2 UI.# set text "Subjects"] ++ z
+	UI.element out #+ subjects
+	return (out,buttons)
+
+mkS :: [LSubject] -> ([UI Element], [(UI Element, UI Element)])
+mkS sub = (out,y) where
+	x = map mkSubject sub
+	y = map mkButtons sub
+	out = map (\(a,(b,c)) -> a #+ [b,c]) (zip x y)
+		
+mkSubject :: LSubject -> UI Element
+mkSubject subj = do
 	etitle	<- UI.div	#. "title"	#+
 		[	UI.div	#.	"ects"	#+ [string . show $ subj ^. ects]
-		,	UI.div #.	"type"	#+ [string . show $ subj ^. ltype]
-		,	UI.div #.	"name"	#+ [string $ subj ^. name]
+		,	UI.div	#.	"type"	#+ [string . show $ subj ^. ltype]
+		,	UI.div	#.	"name"	#+ [string $ subj ^. name]
 		]
 	egrade	<- UI.div	#. "grade" #+ [string . show $ maybe def (^.grade) (subj ^. result)]
 	eexam	<- UI.div	#. "exam"	#+
 		[	UI.div	#.	"date"	#+ [string $ maybe def (show .(^.date)) (subj ^. result)]
 		,	UI.div	#.	"prof"	#+ [string $ maybe def (^.prof) (subj ^. result)]	
 		]
-	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [brem,bres,etitle,egrade,eexam]
+	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [etitle,egrade,eexam]
 	return outer
-	
-mkSubjects :: [LSubject] -> UI Element
-mkSubjects s = UI.div #. "subjects"  #+ (
-		[UI.h2 UI.# set text "Subjects"] 
-		++(iterateWithIndex 0 mkSubject s)) where 
-	iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
-	iterateWithIndex _ _ [] = []
-	iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
-	
+				
+mkButtons :: LSubject -> (UI Element, UI Element)
+mkButtons su = (brem,bres) where
+	graded	= isJust $ su^.result
+	brem	= UI.button#. "sb1"	#+ [string "-"]
+	bres	= UI.button#. "sb2"	#+ [string $ if graded then "-" else "+"]
+	-- return (brem,bres)
+		
+-- iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
+-- iterateWithIndex _ _ [] = []
+-- iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
+
+subjClasses :: LSubject -> String
+subjClasses g = "subject " ++ show (toStatus g)
+
+
+		
+-- Generats statistics
 mkStats :: [LSubject] -> UI Element
 mkStats s = UI.div #. "stats" #+
 		(	UI.h2 UI.# set text "Statistics"
@@ -346,6 +305,7 @@ mkStats s = UI.div #. "stats" #+
 			emptyline = 	(replicate 38 '_',def)
 			f1d = printf "%.1f"
 			f2d = printf "%.2f"
+			stats :: [UI Element]
 			stats = map formatStat 
 					[	("ECTS",def)
 					,	("Total:", f1d . sum $ s^.. traversed . ects)
@@ -363,43 +323,8 @@ mkStats s = UI.div #. "stats" #+
 					,	("Positive:", show . length $ filterStatus [Pos] s (id))
 					,	("Negative:", show . length $ filterStatus [Neg] s (id))
 					]
-			
-formatStat :: (String,String) -> UI Element
-formatStat (l,v) = UI.div #. "statline" #+ [UI.span #. ("label" ++ (if v==def then " h5" else [])) UI.# set text l, UI.span #. "value" UI.# set text v]
-		
-
-mkButtons :: Int -> LSubject -> UI (Element, Element)
-mkButtons i s = do
-	let graded	= isJust $ s^.result
-	brem	<- UI.button#. "sb1"	#+ [string "-"]
-	bres	<- UI.button#. "sb2"	#+ [string $ if graded then "-" else "+"]
-	-- on UI.click bres $ \_ -> do					--TODO GENERATE ACTIONS FROM CLICK EVENT
-		-- UI.element bres #+ [UI.div UI.# set html ("xx" ++ (if graded then "REM" else "ADD" ++ (show index)))]
-	return (brem,bres)
-	
-	
-mkButton' :: String -> UI (Element, Element)
-mkButton' title = do
-    button <- UI.button UI.#. "button" UI.#+ [string title]
-    view   <- UI.p #+ [UI.element button, string "xD"]
-    return (button, view)
-
-	
-mkButtons' :: UI [Element]
-mkButtons' = do
-    list    <- UI.ul #. "buttons-list"
-    
-    (button1, view1) <- mkButton' button1Title
-    on UI.hover button1 $ \_ -> do
-        UI.element button1 #+ [return button1]
-    on UI.leave button1 $ \_ -> do
-        UI.element button1 #+ []
-    on UI.click button1 $ \_ -> do
-        UI.element button1 UI.# set text (button1Title ++ " [pressed]")
-        liftIO $ threadDelay $ 1000 *  1
-        UI.element list    #+ [UI.li UI.# set html "<b>Delayed</b> result!"]
-    
-    return [list, view1]
-
-  where button1Title = "Click me, I delay a bit"
-        button2Title = "Click me, I work immediately"
+			formatStat :: (String,String) -> UI Element
+			formatStat (l,v) = UI.div #. "statline" #+ 
+				[	UI.span #. ("label" ++ (if v==def then " h5" else [])) UI.# set text l
+				,	UI.span #. "value" UI.# set text v
+				]
