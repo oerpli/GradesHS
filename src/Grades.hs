@@ -221,53 +221,49 @@ setup s w = void $ do
 	return w UI.# set title "Grades.HS"
 	UI.addStyleSheet w "concept.css"
 	
-	ioSubject <- liftIO $ newIORef s
-	(mv,buttons) <- mkView s
-	brem <- fst $ buttons !! 0
-	bres <- snd $ buttons !! 0
-	on UI.click brem $ \_ -> do
-		liftIO $ modifyIORef ioSubject (applyAction (RemSub 0))
-		rSubject <- liftIO $ readIORef ioSubject
-		(mv,buttons) <- mkView rSubject
-		getBody w	UI.# set UI.children mv
-		getBody w	#+ [return brem, return bres]
-	on UI.click bres $ \_ -> do
-		liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
-		rSubject <- liftIO $ readIORef ioSubject
-		(mv,buttons) <- mkView rSubject
-		getBody w	UI.# set UI.children mv
-		getBody w	#+ [return brem, return bres]
-	getBody w	#+ (map (UI.element) mv)
+	io <- liftIO $ newIORef s
+	-- (mv,buttons) <- mkView s
+	-- brem <- fst $ buttons !! 0
+	-- bres <- snd $ buttons !! 0
+	-- on UI.click brem $ \_ -> do
+		-- liftIO $ modifyIORef ioSubject (applyAction (RemSub 0))
+		-- rSubject <- liftIO $ readIORef ioSubject
+		-- (mv,buttons) <- mkView rSubject
+		-- getBody w	UI.# set UI.children mv
+		-- getBody w	#+ [return brem, return bres]
+	-- on UI.click bres $ \_ -> do
+		-- liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
+		-- rSubject <- liftIO $ readIORef ioSubject
+		-- (mv,buttons) <- mkView rSubject
+		-- getBody w	UI.# set UI.children mv
+		-- getBody w	#+ [return brem, return bres]
+	view	<- mkView (w,io) s
+	getBody w	UI.# set UI.children view
 	-- getBody w #+ 
 
 header :: UI Element
 header = UI.h1  #+ [string "Grades.HS"]
 
-mkView :: [LSubject] -> UI ([Element], [(UI Element, UI Element)])
-mkView s = do
+mkView :: (Window,IORef [LSubject]) -> [LSubject] -> UI [Element]
+mkView w s = do
 	-- xxxx <- trace "FUCKTHIS" (UI.div)
-	(subjs,buttons) <- mkSubjects s
+	subjs <- mkSubjects w s
 	m <- UI.div #. "main"
 	UI.element m #+	[header,return subjs, mkStats s]
-	return ([m],buttons)
+	return [m]
 
 -- Generates subject list
-mkSubjects  :: [LSubject] -> UI (Element, [(UI Element, UI Element)])
-mkSubjects s = do
-	out <- UI.div #. "subjects"
-	let (z,buttons) = mkS s
-	let subjects = [UI.h2 UI.# set text "Subjects"] ++ z
-	UI.element out #+ subjects
-	return (out,buttons)
+mkSubjects  :: (Window,IORef [LSubject]) -> [LSubject] -> UI Element
+mkSubjects w s = UI.div #. "subjects" #+ iterateWithIndex 0 (mkSubject w) s
 
-mkS :: [LSubject] -> ([UI Element], [(UI Element, UI Element)])
-mkS sub = (out,y) where
-	x = map mkSubject sub
-	y = map mkButtons sub
-	out = map (\(a,(b,c)) -> a #+ [b,c]) (zip x y)
+-- mkS :: [LSubject] -> ([UI Element], [(UI Element, UI Element)])
+-- mkS sub = (out,y) where
+	-- x = map mkSubject sub
+	-- y = map mkButtons sub
+	-- out = map (\(a,(b,c)) -> a #+ [b,c]) (zip x y)
 		
-mkSubject :: LSubject -> UI Element
-mkSubject subj = do
+mkSubject :: (Window,IORef [LSubject])-> Int ->  LSubject -> UI Element
+mkSubject w index subj = do
 	etitle	<- UI.div	#. "title"	#+
 		[	UI.div	#.	"ects"	#+ [string . show $ subj ^. ects]
 		,	UI.div	#.	"type"	#+ [string . show $ subj ^. ltype]
@@ -278,19 +274,33 @@ mkSubject subj = do
 		[	UI.div	#.	"date"	#+ [string $ maybe def (show .(^.date)) (subj ^. result)]
 		,	UI.div	#.	"prof"	#+ [string $ maybe def (^.prof) (subj ^. result)]	
 		]
-	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [etitle,egrade,eexam]
+	(brem,bres) <- mkButtons w index subj
+	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [etitle,egrade,eexam,brem,bres]
 	return outer
 				
-mkButtons :: LSubject -> (UI Element, UI Element)
-mkButtons su = (brem,bres) where
-	graded	= isJust $ su^.result
-	brem	= UI.button#. "sb1"	#+ [string "-"]
-	bres	= UI.button#. "sb2"	#+ [string $ if graded then "-" else "+"]
-	-- return (brem,bres)
+mkButtons :: (Window,IORef [LSubject])-> Int -> LSubject -> UI (Element, Element)
+mkButtons (w,io) index su = do
+	let graded	= isJust $ su^.result
+	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string "-"]
+	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
+	
+	on UI.click brem $ \_ -> do
+		liftIO $ modifyIORef io (applyAction (RemSub index))
+		rSubject <- liftIO $ readIORef io
+		view	<- mkView (w,io) rSubject
+		getBody w	UI.# set UI.children view
+	-- on UI.click bres $ \_ -> do
+		-- liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
+		-- rSubject <- liftIO $ readIORef ioSubject
+		-- (mv,buttons) <- mkView rSubject
+		-- getBody w	UI.# set UI.children mv
+		-- getBody w	#+ [return brem, return bres]
+	
+	return (brem,bres)
 		
--- iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
--- iterateWithIndex _ _ [] = []
--- iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
+iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
+iterateWithIndex _ _ [] = []
+iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
 
 subjClasses :: LSubject -> String
 subjClasses g = "subject " ++ show (toStatus g)
