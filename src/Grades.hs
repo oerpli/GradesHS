@@ -3,12 +3,12 @@
 
 import				Control.Lens hiding (set)
 import				Control.Monad (when,void,liftM)
+import				TypesGrades
+import				Data.Time
+import				Data.Default (def)
+import qualified 	Data.Map.Strict as Map
 
 import				Data.Maybe
-import				Data.Time
-import				Data.Default
-import				Data.Char
-import qualified	Data.Map.Strict as Map
 -- import Data.Set (Set, member, empty, insert, delete)
 
 import				Text.Printf
@@ -19,135 +19,30 @@ import 				Data.IORef
 import 				Control.Monad.Trans (liftIO)
 
 import 				Graphics.UI.Threepenny.Core hiding (delete)
-import qualified	GHC.Read as R
-import qualified	Text.Read.Lex as L
-import				Text.ParserCombinators.ReadPrec
-import qualified	Text.ParserCombinators.ReadP as P
-
-import Debug.Trace
-
-import Text.ParserCombinators.ReadP
-  ( ReadS
-  , readP_to_S
-  )
-
-data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
-data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
-data LType = VO | VU | UE | PR | SE | T String deriving (Eq)
 
 
 
-data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord) 		-- Different average calculations
-data LStatus = Todo | Pos | Neg deriving (Eq)					-- Different subject stati
-data LAction = 	RemSub Int	-- remove subject with index 		--Available actions from the interface
-			|	RemRes Int	-- remove result from subject with index
+
+
+-- | Different average calculations. NN indicates that negative should be ignored.
+data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord) 		
+
+-- | Available actions from the interface
+data LAction = 	RemSub Int			-- remove subject with index 		
+			|	RemRes Int			-- remove result from subject with index
 			|	AddRes Int LResult	-- add result to index
 			|	AddSub LSubject		-- add subject
 			|	DoNothing			-- in case of failure
--- Stores the subjects added so far.
--- data LState = LState 
-	-- { _subjects	:: [LSubject]
-	-- } 
 
--- 1 Subject. Curriculum is made of this thing. Added grades to do stuff.
-data LSubject = Subject
-	{ _ects 	:: Double			-- Credits
-	, _sws		:: Double			-- Hours/Week
-	, _name		:: String			-- "Einführung in die Physik 3"
-	, _ltype 	:: LType
-	, _result	:: Maybe LResult	-- last try 
-	} deriving (Eq)
-
--- Result of an exam/laboratory/..
-data LResult = Result
-	{ _date		:: Day		-- Date in the system
-	, _grade	:: LGrade	-- Passed with grade
-	, _prof		:: String	-- Examinant
-	} deriving (Eq)
-makeClassy ''LResult
 makeClassy ''LSubject
--- makeLenses ''LState
+makeClassy ''LResult
 
+gradesDouble :: Map.Map LGrade Double
+gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
 
--- instance Default LState where
-	-- def = LState []
-instance Default LResult where
-	def = Result (fromGregorian 0 0 0) (G "") ""
-instance Default LSubject where
-	def = Subject 0 0 "" (T "") Nothing
-instance Default LGrade where
-	def = G ""
-
-
-
-class  Status a  where
-	toStatus :: a -> LStatus
+-- | Make subject to instance of status for convenience
 instance Status LSubject where
 	toStatus s = maybe Todo (toStatus . (^.grade)) (s^.result)
-	
-instance Status LGrade where
-	toStatus (G "") = Todo
-	toStatus (G _)	= Pos
-	toStatus (AT g) = toStatus g
-
-instance Status LGAustrian where
-	toStatus N5 = Neg
-	toStatus _ 	= Pos
-	
-
-instance Show LGrade where
-	show (G s)	= s
-	show (AT x)	= show x
-
-instance Show LStatus where
-	show Pos = "pos"
-	show Neg = "neg"
-	show Todo= "todo"
-
-instance Show LGAustrian where
-	show S1		= "1"
-	show U2		= "2"
-	show B3		= "3"
-	show G4		= "4"
-	show N5		= "5"
-
-instance Show LType where
-	show (T s)	= s
-	show SE		= "SE"
-	show UE		= "UE"
-	show VO		= "VO"
-	show VU		= "VU"
-	show PR		= "PR"
-
-instance Show LSubject where
-	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.name) ++ "\t(" ++ show (s^.ects) ++ ")"
-		++  maybe "" ((":\t" ++) . show) (s^.result) where
-		fillTo :: Int -> String -> String
-		fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
-
-instance Show LResult where
-	show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
-
-instance Read LGrade where
-  readPrec =
-    R.parens
-    ( do L.Ident s <- R.lexP
-         case s of
-			"G1"-> return (AT S1)
-			"G2"-> return (AT U2)
-			"G3"-> return (AT B3)
-			"G4"-> return (AT G4)
-			"G5"-> return (AT N5)
-			_	-> return (G (tail s))
-    )
-  readListPrec = R.readListPrecDefault 
-  readList     = R.readListDefault
-  
-
-
-fillTo :: Int -> String -> String
-fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
-
 
 createSubject :: Double -> Double -> String -> LType -> LSubject
 createSubject e s n t  = def 
@@ -156,26 +51,7 @@ createSubject e s n t  = def
 	& name	.~ n
 	& ltype	.~ t
 
-createSubject' :: String -> String -> String -> LSubject
-createSubject' e t n = createSubject (read e) (0) n (readType t)
 
-readType :: String -> LType
-readType s = case (map toUpper s) of
-	"VO"-> VO
-	"VU"-> VU
-	"SE"-> SE
-	"UE"-> UE
-	"PR"-> PR
-	_	-> (T s)
-
-readGrade :: String -> LGrade
-readGrade s = case (map toUpper s) of
-	"1"-> (AT S1)
-	"2"-> (AT U2)
-	"3"-> (AT B3)
-	"4"-> (AT G4)
-	"5"-> (AT N5)
-	_	-> (G s)
 
 createResult :: (Int,Int, Integer) -> LGrade -> String -> LResult
 createResult (d,m,y) g p = def
@@ -183,18 +59,25 @@ createResult (d,m,y) g p = def
 	& grade	.~ g
 	& prof	.~ p
 
+addResult :: LResult -> LSubject -> LSubject
+addResult r s = s & result .~ Just r
+
+	
+-- | for easier creation from user input
+createSubject' :: String -> String -> String -> LSubject
+createSubject' e t n = createSubject (read e) (0) n (fromString' t)
+	
 createResult' :: String -> String -> String -> LResult
-createResult' d g p = createResult'' (read d) (readGrade g) p
+createResult' d g p = createResult'' (read d) (fromString' g) p
 
 createResult'' :: Day -> LGrade -> String -> LResult
 createResult'' d g p = def
 	& date	.~ d
 	& grade	.~ g
 	& prof	.~ p
+	
 
-gradesDouble :: Map.Map LGrade Double
-gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
-
+-- | Calculates the average of the provided subjects with the specified method
 avg :: LAvg -> [LSubject] -> Double
 avg (NN w) x = avg w [s | s <- x, toStatus s == Pos] -- in this case only avg of positive subjects will be considered
 avg wi x  = sumgrades/sumweight  where
@@ -212,14 +95,11 @@ avg wi x  = sumgrades/sumweight  where
 filterStatus :: [LStatus] -> [LSubject] -> ([LSubject] -> b) -> b
 filterStatus status s f = f [x | x <- s, elem (toStatus x) status]
 
-
 filterGraded :: [LSubject] -> [LSubject]
 filterGraded x = filter (\e -> isJust $ e ^. result) x
 
 
-addResult :: LResult -> LSubject -> LSubject
-addResult r s = s & result .~ Just r
-
+-- | Applies an action to a list of subjects and returns the modified list.
 applyAction :: LAction -> [LSubject]-> [LSubject]
 applyAction (RemSub i) s 	= ys ++ (tail zs) where (ys,zs) = splitAt i s
 applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
@@ -227,7 +107,7 @@ applyAction (AddSub n) s 	= s ++ [n]
 applyAction (AddRes i r) s 	= s & ix i . result .~ Just r
 applyAction _ s= s
 	
--- Testdaten
+-- Some data to demonstrante how it works.
 so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexner")(createSubject 2 1 "Sophomore" SE) 
 e3 = addResult (createResult (10,12,2013) (AT S1) "Prof. iR Dr. Wolfgang Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik III" VO) 
 e4 = addResult (createResult (19,02,2014) (AT G4) "Prof. iR Dr. Wolfgang Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik IV" VO) 
@@ -249,30 +129,20 @@ setup s w = void $ do
 	UI.addStyleSheet w "concept.css"
 	io <- liftIO $ newIORef (catMaybes s)
 	view	<- mkView (w,io) s
-	getBody w	UI.# set UI.children view
-	-- getBody w #+ 
+	getBody w	UI.# set UI.children [view]
 
-header :: UI Element
-header = UI.h1  #+ [string "Grades.HS"]
 
-mkView :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI [Element]
+mkView :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
 mkView w s = do
 	-- xxxx <- trace "FUCKTHIS" (UI.div)
-	subjs <- mkSubjects w s
-	m <- UI.div #. "main"
-	UI.element m #+	[header,return subjs, mkStats s]
-	return [m]
+	let header = UI.h1  #+ [string "Grades.HS"]
+	UI.div #. "main" #+	[header,mkSubjects w s, mkStats s]
 
--- Generates subject list
+-- | Subject list
 mkSubjects  :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
 mkSubjects w s = UI.div #. "subjects" #+ (UI.h2 UI.# set text "Subjects":iterateWithIndex 0 (mkSubject w) s)
 
--- mkS :: [LSubject] -> ([UI Element], [(UI Element, UI Element)])
--- mkS sub = (out,y) where
-	-- x = map mkSubject sub
-	-- y = map mkButtons sub
-	-- out = map (\(a,(b,c)) -> a #+ [b,c]) (zip x y)
-		
+-- | Entry in subject list
 mkSubject :: (Window,IORef [LSubject])-> Int ->  (Maybe LSubject) -> UI Element
 mkSubject w index subj' = do
 	let subj = fromMaybe def subj'
@@ -290,7 +160,8 @@ mkSubject w index subj' = do
 	let items = if isJust subj' then [etitle,egrade,eexam] else []
 	outer <- UI.div		#. (subjClasses subj') UI.# set UI.children (items ++ buttons)
 	return outer
-				
+
+-- | Provides buttons and input fields for user entry/modifications. Also binds the those elements.	
 mkButtons :: (Window,IORef [LSubject])-> Int -> (Maybe LSubject) -> UI [Element]
 mkButtons (w,io) index su = do
 	let isnew = not $ isJust su
@@ -298,13 +169,14 @@ mkButtons (w,io) index su = do
 	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
 	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
 	
-	e	<- UI.input #. "input iects" UI.# set (attr "placeholder") "ECTS"
-	t	<- UI.input #. "input itype" UI.# set (attr "placeholder") "Type"
-	n	<- UI.input #. "input iname" UI.# set (attr "placeholder") "Subject"
-	
-	d	<- UI.input #. "input2 idate" UI.# set (attr "placeholder") "4Y-2M-2D"
-	p	<- UI.input #. "input2 iprof" UI.# set (attr "placeholder") "Examinant"
-	g	<- UI.input #. "input2 igrade"UI.# set (attr "placeholder") "G"
+	-- create subject 
+	e	<- UI.input #. "input iects" 	UI.# set (attr "placeholder") "ECTS"		UI.# set (attr "pattern")"[0-9]+[.]?[0-9]?"	
+	t	<- UI.input #. "input itype" 	UI.# set (attr "placeholder") "Type"		UI.# set (attr "pattern")"VU|VO|SE|PR|LU|UE"
+	n	<- UI.input #. "input iname" 	UI.# set (attr "placeholder") "Subject"
+	-- create exam (result)
+	d	<- UI.input #. "input2 idate"	UI.# set (attr "placeholder") "4Y-2M-2D"	UI.# set (attr "pattern")"[0-9]{4}[-][0-9]{2}[-][0-9]{2}"	
+	p	<- UI.input #. "input2 iprof"	UI.# set (attr "placeholder") "Examinant"
+	g	<- UI.input #. "input2 igrade"	UI.# set (attr "placeholder")  "G"			UI.# set (attr "pattern")"[1|2|3|4|5|+|-]"	
 	
 	on UI.click brem $ \_ -> do
 		case isnew of
@@ -313,9 +185,8 @@ mkButtons (w,io) index su = do
 				liftIO $ modifyIORef io (applyAction (AddSub subj))
 			False -> do
 				liftIO $ modifyIORef io (applyAction (RemSub index))
-		rSubject <- liftIO $ readIORef io
-		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
-		getBody w	UI.# set UI.children view
+		outputNewState (w,io)
+
 	on UI.click bres $ \_ -> do
 		case graded of
 			True -> do
@@ -323,34 +194,41 @@ mkButtons (w,io) index su = do
 			False ->do
 				res	<- getResult (d,p,g)
 				liftIO $ modifyIORef io (applyAction (AddRes index res))
-		rSubject <- liftIO $ readIORef io
-		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
-		getBody w	UI.# set UI.children view
-	
+		outputNewState (w,io)
 
 	let out = if isnew	then ([brem] ++ [e,t,n])	else
 		if 	graded	then [brem,bres]	else ([brem,bres] ++[d,p,g])
 	return out
 
--- mkInSubject (w,io) su = (iects,itype,iname) where
+-- | Renders the current content of the IORef in the specified window
+outputNewState :: (Window, IORef [LSubject]) -> UI Element
+outputNewState (w,io) = do
+	rSubject <- liftIO $ readIORef io
+	view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
+	getBody w	UI.# set UI.children [view]
 
+-- | Returns result from the form elements
+getResult :: (Element, Element, Element) -> UI LResult
 getResult (di,pi,gi) = do
 	d <- di UI.# UI.get value
 	g <- gi UI.# UI.get value
 	p <- pi UI.# UI.get value
 	return $ createResult' d g p
 
+-- | Returns subject from the form elements
+getSubject :: (Element, Element, Element) -> UI LSubject
 getSubject (ei,ti,ni) = do
 	e <- ei UI.# UI.get value
 	t <- ti UI.# UI.get value
 	n <- ni UI.# UI.get value
 	return $ createSubject' e t n
 	
-	
+-- | iterates through list and calls function with index of the element	
 iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
 iterateWithIndex _ _ [] = []
 iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
 
+-- | String represantation of the classes of a subject
 subjClasses :: (Maybe LSubject) -> String
 subjClasses Nothing	= "subject new"
 subjClasses (Just g)= "subject " ++ show (toStatus g)
