@@ -5,10 +5,23 @@ Tool for tracking your grades.
 
 
 ### Usage
-Compile it or run `main :: IO()` from ghci.
-It usually says what commands are possible.
+Compile and run `main :: IO ()` (or use the binary) and open `localhost:9999` in your browser
 
-Here's a short overview:
+On the left side there are the currently tracked subjects - the list is initalized with default data - if you don't want to remove it every time change the source code or wait for the save update.
+
+Enter the data in the input fields and press the nearby `+`. If you mess up the format the application will crash.
+If you want to remove a subject press the upper `-`. If you want to remove an exam from a subject press the lower  `-`.
+
+1 is the best grade. 5 is negative. "+" is neutral and does not influence the average.
+
+### Planned:
+- kinda international (at least modular) grade support
+- advanced statistics (plots etc)
+
+
+
+#### Deprecated:
+In `./src/grades-console.hs` there is some old stuff from a terminal version - it's more or less compatible with the current build but not longer maintained.
 
 - `list`: Lists all subjects added so far
 - `mod`:  Modify subjects
@@ -18,8 +31,3 @@ Here's a short overview:
     - `sub`:  Remove subject
     - `res`:  Remove result
 
-### Planned:
-- different averaging techniques.
-- kinda international (at least modular) grade support
-- advanced statistics.
-- GUI
