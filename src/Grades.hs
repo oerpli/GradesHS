@@ -2,7 +2,7 @@
 -- module GradesHS where
 
 import				Control.Lens hiding (set)
-import				Control.Monad (when,void)
+import				Control.Monad (when,void,liftM)
 
 import				Data.Maybe
 import				Data.Time
@@ -156,18 +156,41 @@ createSubject e s n t  = def
 	& name	.~ n
 	& ltype	.~ t
 
+createSubject' :: String -> String -> String -> LSubject
+createSubject' e t n = createSubject (read e) (0) n (readType t)
+
+readType :: String -> LType
+readType s = case (map toUpper s) of
+	"VO"-> VO
+	"VU"-> VU
+	"SE"-> SE
+	"UE"-> UE
+	"PR"-> PR
+	_	-> (T s)
+
+readGrade :: String -> LGrade
+readGrade s = case (map toUpper s) of
+	"1"-> (AT S1)
+	"2"-> (AT U2)
+	"3"-> (AT B3)
+	"4"-> (AT G4)
+	"5"-> (AT N5)
+	_	-> (G s)
+
 createResult :: (Int,Int, Integer) -> LGrade -> String -> LResult
 createResult (d,m,y) g p = def
 	& date	.~ fromGregorian y m d
 	& grade	.~ g
 	& prof	.~ p
 
-createResult'' :: [String] -> LResult
-createResult'' (d:m:y:g:p:_) = createResult' (d,m,y) g p
-createResult'' _ = error "need more strings"
+createResult' :: String -> String -> String -> LResult
+createResult' d g p = createResult'' (read d) (readGrade g) p
 
-createResult' :: (String,String,String) -> String -> String -> LResult
-createResult' (d,m,y) g p = createResult (read d, read m,read y) (read ('G' :g)) p
+createResult'' :: Day -> LGrade -> String -> LResult
+createResult'' d g p = def
+	& date	.~ d
+	& grade	.~ g
+	& prof	.~ p
 
 gradesDouble :: Map.Map LGrade Double
 gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
@@ -211,7 +234,7 @@ e4 = addResult (createResult (19,02,2014) (AT G4) "Prof. iR Dr. Wolfgang Pfeiler
 cp = addResult (createResult (26,03,2014) (AT S1) "Univ.-Prof Dr. Martin Neumann")(createSubject 5 1 "Computational Physics" VO)
 cp2 = (createSubject 5 1 "Computational Physics II" VO)
 stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
-std = map Just [cp,e3,e4,stat,so,cp2,cp,e3,e4,stat,so,cp2] ++ [Nothing]
+std = map Just [cp,e3,e4,stat,so,cp2] ++ [Nothing]
 
 
 -- GUI (ugly code starts here)
@@ -275,22 +298,55 @@ mkButtons (w,io) index su = do
 	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
 	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
 	
+	e	<- UI.input #. "input iects" UI.# set (attr "placeholder") "ECTS"
+	t	<- UI.input #. "input itype" UI.# set (attr "placeholder") "Type"
+	n	<- UI.input #. "input iname" UI.# set (attr "placeholder") "Subject"
+	
+	d	<- UI.input #. "input2 idate" UI.# set (attr "placeholder") "4Y-2M-2D"
+	p	<- UI.input #. "input2 iprof" UI.# set (attr "placeholder") "Examinant"
+	g	<- UI.input #. "input2 igrade"UI.# set (attr "placeholder") "G"
+	
 	on UI.click brem $ \_ -> do
-		liftIO $ modifyIORef io (applyAction (RemSub index))
+		case isnew of
+			True -> do
+				subj<- getSubject (e,t,n)
+				liftIO $ modifyIORef io (applyAction (AddSub subj))
+			False -> do
+				liftIO $ modifyIORef io (applyAction (RemSub index))
 		rSubject <- liftIO $ readIORef io
 		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
 		getBody w	UI.# set UI.children view
 	on UI.click bres $ \_ -> do
-		if graded then
-			liftIO $ modifyIORef io (applyAction (RemRes index))
-		else
-			return ()
+		case graded of
+			True -> do
+				liftIO $ modifyIORef io (applyAction (RemRes index))
+			False ->do
+				res	<- getResult (d,p,g)
+				liftIO $ modifyIORef io (applyAction (AddRes index res))
 		rSubject <- liftIO $ readIORef io
 		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
 		getBody w	UI.# set UI.children view
-	let out = if isnew then [brem] else [brem,bres]
+	
+
+	let out = if isnew	then ([brem] ++ [e,t,n])	else
+		if 	graded	then [brem,bres]	else ([brem,bres] ++[d,p,g])
 	return out
-		
+
+-- mkInSubject (w,io) su = (iects,itype,iname) where
+
+getResult (di,pi,gi) = do
+	d <- di UI.# UI.get value
+	g <- gi UI.# UI.get value
+	p <- pi UI.# UI.get value
+	return $ createResult' d g p
+
+getSubject (ei,ti,ni) = do
+	e <- ei UI.# UI.get value
+	t <- ti UI.# UI.get value
+	n <- ni UI.# UI.get value
+	return $ createSubject' e t n
+	
+	
 iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
 iterateWithIndex _ _ [] = []
 iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)

@@ -22,16 +22,22 @@
 	<div class="exam">
 		<span class="date">23-05-2014</span>
 		<span class="prof">Dr. Martin Neumann</span>
-	</div>
+	</div>		
+
 </div>
 <div class="subject todo">
 	<button class="sbutton sb1">-</button>
-	<button class="sbutton sb2">R</button>
+	<button class="sbutton sb2">+</button>
 	<span class=title">
 		<span class="ects">6.0</span>
 		<span class="type">VO</span>
 		<span class="name">Einführung in die Physik III</span>
 	</span>
+	<div class="inputs">
+		<input class="input2 idate" type="text" pattern="[0-9]+[-][0-9]+[-][0-9]+" />
+		<input class="input2 iprof" type="text" placeholder="Prof.">
+		<input class="input2 igrade" type="text" pattern="1|2|3|4|5" >
+	</div>
 </div>
 <div class="subject neg">
 	<button class="sbutton sb1">-</button>
@@ -47,6 +53,14 @@
 		<span class="prof">Prof. Viertl</span>
 	</div>
 </div>
+<div class="subject new">
+	<div class="inputs">
+		<input class="input iects" type="text" pattern="[0-9]*[.|,]?[0-9]?" />
+		<input class="input itype" type="text" pattern="VO|UE|SE|PR" >
+		<input class="input iname" type="text">
+	</div>
+	<button class="sbutton sb1">+</button>
+</div>
 </div>
 
 <div class="stats">
@@ -58,3 +72,4 @@
 	<div class="statline"><span class="label">Remaining:</span><span class="value">8.00</span></div>
 </div>
 </div>
+

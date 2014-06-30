@@ -1,8 +1,8 @@
-.wrap ,.statline,.subject{
+.wrap ,.statline,.subject,.inputs{
 	position: relative;
 }
 
-.name,.ects,.type,.grade,.sb1,.sb2,.prof,.date,.subjects,.stats ,.label,.value{
+.name,.ects,.type,.grade,.sb1,.sb2,.prof,.date,.subjects,.stats ,.label,.value,.input,.input2 {
 	position: absolute;
 }
 
@@ -58,13 +58,12 @@
 	text-overflow: clip 
 }
 .name {
-	width: 260px;
 	max-height: 18px;
 }
 
 
 
-.grade {
+.grade{
 	margin: 5px;
 	font-size: 18pt;
 	right: 0px;
@@ -76,16 +75,17 @@
 	font-size: 10pt;
 	bottom: 0px;
 }
-.prof, .name{
-	left: 85px;
+.prof, .name,.iname,.iprof{
+	left: 90px;
+	width: 249px;
 }
-.ects,.date{
+.ects,.date,.iects,.idate{
 	left: 20px;
 }
 .type{
-	left: 50px;
+	left: 53px;
 }
-.ects, .type {
+.ects, .type, {
 	color:	#444;
 }
 
@@ -103,4 +103,48 @@
 }
 .sb2{
 	bottom: 0px;
+}
+
+.input,.input2 {
+	border: none;
+	padding: 0px;
+	margin: 0px;
+	opacity: 0.7;
+}
+.input{
+	top: 0px;
+	border: 1pt solid red;
+
+}
+.input2{
+	border: 1pt solid red;
+	top:17px;
+}
+.itype{
+	width: 29px;
+	left: 56px;
+}
+.iname{
+	width: 278px;
+}
+.iects{
+	width: 30px;
+}
+.igrade{
+	width: 20px;
+	top: 4px;
+	right: 0px;
+	font-size: 18pt;
+	padding-left: 3pt;
+}
+
+.idate{
+	width: 65px;
+}
+
+
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
 }
