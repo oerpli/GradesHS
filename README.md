@@ -15,7 +15,7 @@ If you want to remove a subject press the upper `-`. If you want to remove an ex
 1 is the best grade. 5 is negative. "+" is neutral and does not influence the average.
 
 ### Planned:
-- kinda international (at least modular) grade support
+- international (at least modular) grade support
 - advanced statistics (plots etc)
 
 
