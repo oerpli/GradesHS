@@ -1,28 +1,19 @@
 {-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction, RecursiveDo #-}
 -- module GradesHS where
 
-import				Control.Lens hiding (set)
-import				Control.Monad (when,void,liftM)
-import				TypesGrades
-import				Data.Time
-import				Data.Default (def)
-import qualified 	Data.Map.Strict as Map
-
-import				Data.Maybe
--- import Data.Set (Set, member, empty, insert, delete)
-
-import				Text.Printf
-import				Control.Concurrent (threadDelay)
-import qualified	Graphics.UI.Threepenny as UI
-
-import 				Data.IORef
-import 				Control.Monad.Trans (liftIO)
-
-import 				Graphics.UI.Threepenny.Core hiding (delete)
-
-
-
-
+import	TypesGrades
+import	Text.Printf
+import	Data.Time
+import	Data.Default (def)
+import	Data.Maybe
+import qualified Data.Map.Strict as Map
+-- import				Control.Concurrent (threadDelay)
+import 	Data.IORef	-- safe state
+-- import 				Control.Monad.Trans (liftIO)
+import	Control.Lens hiding (set)
+import	Control.Monad (when,void,liftM)
+import 	Graphics.UI.Threepenny.Core hiding (delete)
+import qualified Graphics.UI.Threepenny as UI
 
 -- | Different average calculations. NN indicates that negative should be ignored.
 data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord) 		
@@ -134,7 +125,7 @@ setup s w = void $ do
 
 mkView :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
 mkView w s = do
-	-- xxxx <- trace "FUCKTHIS" (UI.div)
+	-- asdf <- trace "fuckthis" (UI.div)
 	let header = UI.h1  #+ [string "Grades.HS"]
 	UI.div #. "main" #+	[header,mkSubjects w s, mkStats s]
 

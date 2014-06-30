@@ -110,14 +110,12 @@
 	padding: 0px;
 	margin: 0px;
 	opacity: 0.7;
+	border: 1pt solid #0AC;
 }
 .input{
 	top: 0px;
-	border: 1pt solid red;
-
 }
 .input2{
-	border: 1pt solid red;
 	top:17px;
 }
 .itype{
