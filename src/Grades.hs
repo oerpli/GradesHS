@@ -33,7 +33,7 @@ import Text.ParserCombinators.ReadP
 
 data LGAustrian = S1 | U2 | B3 | G4 | N5 deriving (Eq,Ord)
 data LGrade = AT LGAustrian | G String deriving (Eq,Ord)
-data LType = VO | VU | UE | PR | SE | T String
+data LType = VO | VU | UE | PR | SE | T String deriving (Eq)
 
 
 
@@ -45,9 +45,9 @@ data LAction = 	RemSub Int	-- remove subject with index 		--Available actions fr
 			|	AddSub LSubject		-- add subject
 			|	DoNothing			-- in case of failure
 -- Stores the subjects added so far.
-data LState = LState 
-	{ _subjects	:: [LSubject]
-	} 
+-- data LState = LState 
+	-- { _subjects	:: [LSubject]
+	-- } 
 
 -- 1 Subject. Curriculum is made of this thing. Added grades to do stuff.
 data LSubject = Subject
@@ -56,21 +56,21 @@ data LSubject = Subject
 	, _name		:: String			-- "Einführung in die Physik 3"
 	, _ltype 	:: LType
 	, _result	:: Maybe LResult	-- last try 
-	} 
+	} deriving (Eq)
 
 -- Result of an exam/laboratory/..
 data LResult = Result
 	{ _date		:: Day		-- Date in the system
 	, _grade	:: LGrade	-- Passed with grade
 	, _prof		:: String	-- Examinant
-	}
+	} deriving (Eq)
 makeClassy ''LResult
 makeClassy ''LSubject
-makeLenses ''LState
+-- makeLenses ''LState
 
 
-instance Default LState where
-	def = LState []
+-- instance Default LState where
+	-- def = LState []
 instance Default LResult where
 	def = Result (fromGregorian 0 0 0) (G "") ""
 instance Default LSubject where
@@ -161,7 +161,11 @@ createResult (d,m,y) g p = def
 	& date	.~ fromGregorian y m d
 	& grade	.~ g
 	& prof	.~ p
-	
+
+createResult'' :: [String] -> LResult
+createResult'' (d:m:y:g:p:_) = createResult' (d,m,y) g p
+createResult'' _ = error "need more strings"
+
 createResult' :: (String,String,String) -> String -> String -> LResult
 createResult' (d,m,y) g p = createResult (read d, read m,read y) (read ('G' :g)) p
 
@@ -207,7 +211,7 @@ e4 = addResult (createResult (19,02,2014) (AT G4) "Prof. iR Dr. Wolfgang Pfeiler
 cp = addResult (createResult (26,03,2014) (AT S1) "Univ.-Prof Dr. Martin Neumann")(createSubject 5 1 "Computational Physics" VO)
 cp2 = (createSubject 5 1 "Computational Physics II" VO)
 stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
-std = [cp,e3,e4,stat,so,cp2]
+std = map Just [cp,e3,e4,stat,so,cp2,cp,e3,e4,stat,so,cp2] ++ [Nothing]
 
 
 -- GUI (ugly code starts here)
@@ -216,27 +220,11 @@ main = do
 	startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
 	putStrLn "Ready"
 	
-setup :: [LSubject] -> Window -> UI ()
+setup :: [Maybe LSubject] -> Window -> UI ()
 setup s w = void $ do
 	return w UI.# set title "Grades.HS"
 	UI.addStyleSheet w "concept.css"
-	
-	io <- liftIO $ newIORef s
-	-- (mv,buttons) <- mkView s
-	-- brem <- fst $ buttons !! 0
-	-- bres <- snd $ buttons !! 0
-	-- on UI.click brem $ \_ -> do
-		-- liftIO $ modifyIORef ioSubject (applyAction (RemSub 0))
-		-- rSubject <- liftIO $ readIORef ioSubject
-		-- (mv,buttons) <- mkView rSubject
-		-- getBody w	UI.# set UI.children mv
-		-- getBody w	#+ [return brem, return bres]
-	-- on UI.click bres $ \_ -> do
-		-- liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
-		-- rSubject <- liftIO $ readIORef ioSubject
-		-- (mv,buttons) <- mkView rSubject
-		-- getBody w	UI.# set UI.children mv
-		-- getBody w	#+ [return brem, return bres]
+	io <- liftIO $ newIORef (catMaybes s)
 	view	<- mkView (w,io) s
 	getBody w	UI.# set UI.children view
 	-- getBody w #+ 
@@ -244,7 +232,7 @@ setup s w = void $ do
 header :: UI Element
 header = UI.h1  #+ [string "Grades.HS"]
 
-mkView :: (Window,IORef [LSubject]) -> [LSubject] -> UI [Element]
+mkView :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI [Element]
 mkView w s = do
 	-- xxxx <- trace "FUCKTHIS" (UI.div)
 	subjs <- mkSubjects w s
@@ -253,8 +241,8 @@ mkView w s = do
 	return [m]
 
 -- Generates subject list
-mkSubjects  :: (Window,IORef [LSubject]) -> [LSubject] -> UI Element
-mkSubjects w s = UI.div #. "subjects" #+ iterateWithIndex 0 (mkSubject w) s
+mkSubjects  :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
+mkSubjects w s = UI.div #. "subjects" #+ (UI.h2 UI.# set text "Subjects":iterateWithIndex 0 (mkSubject w) s)
 
 -- mkS :: [LSubject] -> ([UI Element], [(UI Element, UI Element)])
 -- mkS sub = (out,y) where
@@ -262,8 +250,9 @@ mkSubjects w s = UI.div #. "subjects" #+ iterateWithIndex 0 (mkSubject w) s
 	-- y = map mkButtons sub
 	-- out = map (\(a,(b,c)) -> a #+ [b,c]) (zip x y)
 		
-mkSubject :: (Window,IORef [LSubject])-> Int ->  LSubject -> UI Element
-mkSubject w index subj = do
+mkSubject :: (Window,IORef [LSubject])-> Int ->  (Maybe LSubject) -> UI Element
+mkSubject w index subj' = do
+	let subj = fromMaybe def subj'
 	etitle	<- UI.div	#. "title"	#+
 		[	UI.div	#.	"ects"	#+ [string . show $ subj ^. ects]
 		,	UI.div	#.	"type"	#+ [string . show $ subj ^. ltype]
@@ -274,44 +263,48 @@ mkSubject w index subj = do
 		[	UI.div	#.	"date"	#+ [string $ maybe def (show .(^.date)) (subj ^. result)]
 		,	UI.div	#.	"prof"	#+ [string $ maybe def (^.prof) (subj ^. result)]	
 		]
-	(brem,bres) <- mkButtons w index subj
-	outer <- UI.div		#. (subjClasses subj) UI.# set UI.children [etitle,egrade,eexam,brem,bres]
+	buttons <- mkButtons w index subj'
+	let items = if isJust subj' then [etitle,egrade,eexam] else []
+	outer <- UI.div		#. (subjClasses subj') UI.# set UI.children (items ++ buttons)
 	return outer
 				
-mkButtons :: (Window,IORef [LSubject])-> Int -> LSubject -> UI (Element, Element)
+mkButtons :: (Window,IORef [LSubject])-> Int -> (Maybe LSubject) -> UI [Element]
 mkButtons (w,io) index su = do
-	let graded	= isJust $ su^.result
-	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string "-"]
+	let isnew = not $ isJust su
+	let graded	= isJust $ (fromMaybe def su)^.result
+	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
 	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
 	
 	on UI.click brem $ \_ -> do
 		liftIO $ modifyIORef io (applyAction (RemSub index))
 		rSubject <- liftIO $ readIORef io
-		view	<- mkView (w,io) rSubject
+		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
 		getBody w	UI.# set UI.children view
-	-- on UI.click bres $ \_ -> do
-		-- liftIO $ modifyIORef ioSubject (applyAction (RemRes 0))
-		-- rSubject <- liftIO $ readIORef ioSubject
-		-- (mv,buttons) <- mkView rSubject
-		-- getBody w	UI.# set UI.children mv
-		-- getBody w	#+ [return brem, return bres]
-	
-	return (brem,bres)
+	on UI.click bres $ \_ -> do
+		if graded then
+			liftIO $ modifyIORef io (applyAction (RemRes index))
+		else
+			return ()
+		rSubject <- liftIO $ readIORef io
+		view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
+		getBody w	UI.# set UI.children view
+	let out = if isnew then [brem] else [brem,bres]
+	return out
 		
 iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
 iterateWithIndex _ _ [] = []
 iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
 
-subjClasses :: LSubject -> String
-subjClasses g = "subject " ++ show (toStatus g)
+subjClasses :: (Maybe LSubject) -> String
+subjClasses Nothing	= "subject new"
+subjClasses (Just g)= "subject " ++ show (toStatus g)
 
-
-		
 -- Generats statistics
-mkStats :: [LSubject] -> UI Element
-mkStats s = UI.div #. "stats" #+
+mkStats :: [Maybe LSubject] -> UI Element
+mkStats s'= UI.div #. "stats" #+
 		(	UI.h2 UI.# set text "Statistics"
 		: 	UI.div #. "statwrap" #+ stats :[]) where
+			s = catMaybes s'
 			emptyline = 	(replicate 38 '_',def)
 			f1d = printf "%.1f"
 			f2d = printf "%.2f"

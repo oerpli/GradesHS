@@ -49,6 +49,9 @@
 .todo{
 	background: #FFD700
 }
+.new{
+	background: #ACE5EE
+}
 
 .name,.prof,.title{
 	overflow: hidden;
