@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction, RecursiveDo #-}
 -- module GradesHS where
 
-import	TypesGrades
+import	GradesTypes
 import	Text.Printf
 import	Data.Time
 import	Data.Default (def)
@@ -42,8 +42,6 @@ createSubject e s n t  = def
 	& name	.~ n
 	& ltype	.~ t
 
-
-
 createResult :: (Int,Int, Integer) -> LGrade -> String -> LResult
 createResult (d,m,y) g p = def
 	& date	.~ fromGregorian y m d
@@ -52,7 +50,6 @@ createResult (d,m,y) g p = def
 
 addResult :: LResult -> LSubject -> LSubject
 addResult r s = s & result .~ Just r
-
 	
 -- | for easier creation from user input
 createSubject' :: String -> String -> String -> LSubject
@@ -156,15 +153,25 @@ mkButtons (w,io) index su = do
 	let graded	= isJust $ (fromMaybe def su)^.result
 	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
 	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
-	
+
 	-- create subject 
-	e	<- UI.input #. "input iects" 	UI.# set (attr "placeholder") "ECTS"		UI.# set (attr "pattern")"[0-9]+[.]?[0-9]?"	
-	t	<- UI.input #. "input itype" 	UI.# set (attr "placeholder") "Type"		UI.# set (attr "pattern")"VU|VO|SE|PR|LU|UE"
-	n	<- UI.input #. "input iname" 	UI.# set (attr "placeholder") "Subject"
+	e	<- UI.input #. "input iects"
+			UI.# set (attr "placeholder") "ECTS"
+			UI.# set (attr "pattern")"[0-9]+[.]?[0-9]?"	
+	t	<- UI.input #. "input itype"
+			UI.# set (attr "placeholder") "Type"
+			UI.# set (attr "pattern")"(?i)VU|VO|SE|PR|LU|UE"
+	n	<- UI.input #. "input iname"
+			UI.# set (attr "placeholder") "Subject"
 	-- create exam (result)
-	d	<- UI.input #. "input2 idate"	UI.# set (attr "placeholder") "4Y-2M-2D"	UI.# set (attr "pattern")"[0-9]{4}[-][0-9]{2}[-][0-9]{2}"	
-	p	<- UI.input #. "input2 iprof"	UI.# set (attr "placeholder") "Examinant"
-	g	<- UI.input #. "input2 igrade"	UI.# set (attr "placeholder")  "G"			UI.# set (attr "pattern")"[1|2|3|4|5|+|-]"	
+	d	<- UI.input #. "input2 idate"
+			UI.# set (attr "placeholder") "4Y-2M-2D"
+			UI.# set (attr "pattern")"[0-9]{4}[-][0-9]{2}[-][0-9]{2}"	
+	p	<- UI.input #. "input2 iprof"
+			UI.# set (attr "placeholder") "Examinant"
+	g	<- UI.input #. "input2 igrade"	
+			UI.# set (attr "placeholder")  "G"
+			UI.# set (attr "pattern")"[1|2|3|4|5|+|-]"	
 	
 	on UI.click brem $ \_ -> do
 		case isnew of

@@ -1,4 +1,4 @@
-module TypesGrades where
+module GradesTypes where
 import	Data.Time
 import	Data.Char (toUpper)
 import	Data.Default
