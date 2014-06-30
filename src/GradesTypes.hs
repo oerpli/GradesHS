@@ -81,22 +81,22 @@ class Read' a where
 	fromString' :: String -> a
 
 instance Read' LType where
-	fromString' s = case (map toUpper s) of
+	fromString' s = case map toUpper s of
 		"VO"-> VO
 		"VU"-> VU
 		"SE"-> SE
 		"UE"-> UE
 		"PR"-> PR
-		_	-> (T s)
+		_	-> T s
 
 instance Read' LGrade where
-	fromString' s = case (map toUpper s) of
-		"1"-> (AT S1)
-		"2"-> (AT U2)
-		"3"-> (AT B3)
-		"4"-> (AT G4)
-		"5"-> (AT N5)
-		_	-> (G s)
+	fromString' s = case map toUpper s of
+		"1"-> AT S1
+		"2"-> AT U2
+		"3"-> AT B3
+		"4"-> AT G4
+		"5"-> AT N5
+		_	->G s
 
 -- | Default values for custom types
 instance Default LResult where

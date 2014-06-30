@@ -53,10 +53,10 @@ addResult r s = s & result .~ Just r
 	
 -- | for easier creation from user input
 createSubject' :: String -> String -> String -> LSubject
-createSubject' e t n = createSubject (read e) (0) n (fromString' t)
+createSubject' e t n = createSubject (read e) 0 n (fromString' t)
 	
 createResult' :: String -> String -> String -> LResult
-createResult' d g p = createResult'' (read d) (fromString' g) p
+createResult' d g = createResult'' (read d) (fromString' g)
 
 createResult'' :: Day -> LGrade -> String -> LResult
 createResult'' d g p = def
@@ -73,21 +73,21 @@ avg wi x  = sumgrades/sumweight  where
 		ECTS-> y^..traversed.ects
 		SWS -> y^..traversed.sws
 		UW	-> replicate (length y) 1.0
-	getgrades z = (catMaybes $ (z ^.. traversed.result))^.. traversed.grade -- gets grades from subjects
-	gradesdouble = map (\x -> Map.lookup x gradesDouble) (getgrades y)	-- looks up double value of grades
+	getgrades z = catMaybes (z ^.. traversed.result) ^.. traversed.grade -- gets grades from subjects
+	gradesdouble = map (`Map.lookup` gradesDouble) (getgrades y)	-- looks up double value of grades
 	filtered = [(z,y)|(x,y)<-zip gradesdouble weights,(Just z) <- [x],isJust x] -- filters out grades without double
-	sumweight = sum $ map (\(_,y) -> y) filtered
-	sumgrades = sum $ map (\(x,y) -> x*y) filtered
+	sumweight = sum $ map snd filtered
+	sumgrades = sum $ map (uncurry (*)) filtered
 	
 filterStatus :: [LStatus] -> [LSubject] -> ([LSubject] -> b) -> b
-filterStatus status s f = f [x | x <- s, elem (toStatus x) status]
+filterStatus status s f = f [x | x <- s, toStatus x `elem` status]
 
 filterGraded :: [LSubject] -> [LSubject]
-filterGraded x = filter (\e -> isJust $ e ^. result) x
+filterGraded = filter (\e -> isJust $ e ^. result)
 
 -- | Applies an action to a list of subjects and returns the modified list.
 applyAction :: LAction -> [LSubject]-> [LSubject]
-applyAction (RemSub i) s 	= ys ++ (tail zs) where (ys,zs) = splitAt i s
+applyAction (RemSub i) s 	= ys ++ tail zs where (ys,zs) = splitAt i s
 applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
 applyAction (AddSub n) s 	= s ++ [n]
 applyAction (AddRes i r) s 	= s & ix i . result .~ Just r
@@ -98,15 +98,14 @@ so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexne
 e3 = addResult (createResult (10,12,2013) (AT S1) "Prof. iR Dr. Wolfgang Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik III" VO) 
 e4 = addResult (createResult (19,02,2014) (AT G4) "Prof. iR Dr. Wolfgang Pfeiler")(createSubject 6 1 "Einfuehrung in die Physik IV" VO) 
 cp = addResult (createResult (26,03,2014) (AT S1) "Univ.-Prof Dr. Martin Neumann")(createSubject 5 1 "Computational Physics" VO)
-cp2 = (createSubject 5 1 "Computational Physics II" VO)
+cp2 = createSubject 5 1 "Computational Physics II" VO
 stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
 std = map Just [cp,e3,e4,stat,so,cp2] ++ [Nothing]
 
 
 -- GUI (ugly code starts here)
 main :: IO ()
-main = do
-	startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
+main = startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
 	
 setup :: [Maybe LSubject] -> Window -> UI ()
 setup s w = void $ do
@@ -127,7 +126,7 @@ mkSubjects  :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
 mkSubjects w s = UI.div #. "subjects" #+ (UI.h2 UI.# set text "Subjects":iterateWithIndex 0 (mkSubject w) s)
 
 -- | Entry in subject list
-mkSubject :: (Window,IORef [LSubject])-> Int ->  (Maybe LSubject) -> UI Element
+mkSubject :: (Window,IORef [LSubject])-> Int -> Maybe LSubject -> UI Element
 mkSubject w index subj' = do
 	let subj = fromMaybe def subj'
 	etitle	<- UI.div	#. "title"	#+
@@ -142,14 +141,13 @@ mkSubject w index subj' = do
 		]
 	buttons <- mkButtons w index subj'
 	let items = if isJust subj' then [etitle,egrade,eexam] else []
-	outer <- UI.div		#. (subjClasses subj') UI.# set UI.children (items ++ buttons)
-	return outer
+	UI.div		#.	subjClasses subj'	UI.# set UI.children (items ++ buttons)
 
 -- | Provides buttons and input fields for user entry/modifications. Also binds the those elements.	
-mkButtons :: (Window,IORef [LSubject])-> Int -> (Maybe LSubject) -> UI [Element]
+mkButtons :: (Window,IORef [LSubject])-> Int -> Maybe LSubject -> UI [Element]
 mkButtons (w,io) index su = do
-	let isnew = not $ isJust su
-	let graded	= isJust $ (fromMaybe def su)^.result
+	let isnew = isNothing su
+	let graded	= isJust $ fromMaybe def su ^.result
 	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
 	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
 
@@ -173,32 +171,32 @@ mkButtons (w,io) index su = do
 			UI.# set (attr "pattern")"[1|2|3|4|5|+|-]"	
 	
 	on UI.click brem $ \_ -> do
-		case isnew of
-			True -> do
-				subj<- getSubject (e,t,n)
-				liftIO $ modifyIORef io (applyAction (AddSub subj))
-			False -> do
-				liftIO $ modifyIORef io (applyAction (RemSub index))
+		if isnew then do
+			subj<- getSubject (e,t,n)
+			liftIO $ modifyIORef io (applyAction (AddSub subj))
+		else
+			liftIO $ modifyIORef io (applyAction (RemSub index))
 		outputNewState (w,io)
 
 	on UI.click bres $ \_ -> do
-		case graded of
-			True -> do
-				liftIO $ modifyIORef io (applyAction (RemRes index))
-			False ->do
-				res	<- getResult (d,p,g)
-				liftIO $ modifyIORef io (applyAction (AddRes index res))
+		if graded then
+			liftIO $ modifyIORef io (applyAction (RemRes index))
+		else do
+			res	<- getResult (d,p,g)
+			liftIO $ modifyIORef io (applyAction (AddRes index res))		
 		outputNewState (w,io)
-
-	let out = if isnew	then ([brem] ++ [e,t,n])	else
-		if 	graded	then [brem,bres]	else ([brem,bres] ++[d,p,g])
-	return out
+	let out = arbitraryName where
+		arbitraryName
+			| isnew = brem :[e,t,n]
+			| graded = [brem,bres]
+			| otherwise = [brem,bres] ++ [d,p,g]
+	return out where
 
 -- | Renders the current content of the IORef in the specified window
 outputNewState :: (Window, IORef [LSubject]) -> UI Element
 outputNewState (w,io) = do
 	rSubject <- liftIO $ readIORef io
-	view	<- mkView (w,io) ((map Just rSubject)++[Nothing])
+	view	<- mkView (w,io) (map Just rSubject ++ [Nothing])
 	getBody w	UI.# set UI.children [view]
 
 -- | Returns result from the form elements
@@ -220,18 +218,17 @@ getSubject (ei,ti,ni) = do
 -- | iterates through list and calls function with index of the element	
 iterateWithIndex :: Int -> (Int -> a -> b) -> [a] -> [b]
 iterateWithIndex _ _ [] = []
-iterateWithIndex i f (c:cs) = f i c : (iterateWithIndex (i+1) f cs)
+iterateWithIndex i f (c:cs) = f i c : iterateWithIndex (i+1) f cs
 
 -- | String represantation of the classes of a subject
-subjClasses :: (Maybe LSubject) -> String
+subjClasses :: Maybe LSubject -> String
 subjClasses Nothing	= "subject new"
 subjClasses (Just g)= "subject " ++ show (toStatus g)
 
 -- Generats statistics
 mkStats :: [Maybe LSubject] -> UI Element
-mkStats s'= UI.div #. "stats" #+
-		(	UI.h2 UI.# set text "Statistics"
-		: 	UI.div #. "statwrap" #+ stats :[]) where
+mkStats s'= UI.div #. "stats" #+ [UI.h2 UI.# set text "Statistics"
+			,UI.div #. "statwrap" #+ stats] where
 			s = catMaybes s'
 			-- emptyline = (replicate 38 '_',def)
 			f1d = printf "%.1f"
@@ -251,8 +248,8 @@ mkStats s'= UI.div #. "stats" #+
 					-- ,	emptyline
 					,	("Subjects",def)
 					,	("Total:", show . length $ s)
-					,	("Positive:", show . length $ filterStatus [Pos] s (id))
-					,	("Negative:", show . length $ filterStatus [Neg] s (id))
+					,	("Positive:", show . length $ filterStatus [Pos] s id)
+					,	("Negative:", show . length $ filterStatus [Neg] s id)
 					]
 			formatStat :: (String,String) -> UI Element
 			formatStat (l,v) = UI.div #. "statline" #+ 
