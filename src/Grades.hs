@@ -107,7 +107,6 @@ std = map Just [cp,e3,e4,stat,so,cp2] ++ [Nothing]
 main :: IO ()
 main = do
 	startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
-	putStrLn "Ready"
 	
 setup :: [Maybe LSubject] -> Window -> UI ()
 setup s w = void $ do
@@ -234,7 +233,7 @@ mkStats s'= UI.div #. "stats" #+
 		(	UI.h2 UI.# set text "Statistics"
 		: 	UI.div #. "statwrap" #+ stats :[]) where
 			s = catMaybes s'
-			emptyline = 	(replicate 38 '_',def)
+			-- emptyline = (replicate 38 '_',def)
 			f1d = printf "%.1f"
 			f2d = printf "%.2f"
 			stats :: [UI Element]
