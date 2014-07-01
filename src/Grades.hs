@@ -21,12 +21,18 @@ data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord)
 -- | Available actions from the interface
 data LAction = 	RemSub Int			-- remove subject with index 		
 			|	RemRes Int			-- remove result from subject with index
-			|	AddRes Int LResult	-- add result to index
-			|	AddSub LSubject		-- add subject
-			|	DoNothing			-- in case of failure
+			|	AddRes Int (Maybe LResult)	-- add result to index
+			|	AddSub (Maybe LSubject)		-- add subject
+			-- |	DoNothing			-- in case of failure
 
 makeClassy ''LSubject
 makeClassy ''LResult
+
+maybeDouble :: String -> Maybe Double
+maybeDouble = fmap fst . listToMaybe . reads
+
+maybeDay :: String -> Maybe Day
+maybeDay = fmap fst . listToMaybe . reads
 
 gradesDouble :: Map.Map LGrade Double
 gradesDouble = Map.fromList $ zip [AT S1, AT U2, AT B3, AT G4, AT N5] [1.0,2.0,3.0,4.0,5.0]
@@ -52,11 +58,15 @@ addResult :: LResult -> LSubject -> LSubject
 addResult r s = s & result .~ Just r
 	
 -- | for easier creation from user input
-createSubject' :: String -> String -> String -> LSubject
-createSubject' e t n = createSubject (read e) 0 n (fromString' t)
+createSubject' :: String -> String -> String -> Maybe LSubject
+createSubject' e t n
+	| isJust $ maybeDouble e = Just $ createSubject (read e) 0 n (fromString' t)
+	| otherwise = Nothing
 	
-createResult' :: String -> String -> String -> LResult
-createResult' d g = createResult'' (read d) (fromString' g)
+createResult' :: String -> String -> String -> Maybe LResult
+createResult' d g p
+	| isJust $ maybeDay d	= Just $ createResult'' (read d) (fromString' g) p
+	| otherwise 			= Nothing
 
 createResult'' :: Day -> LGrade -> String -> LResult
 createResult'' d g p = def
@@ -89,9 +99,10 @@ filterGraded = filter (\e -> isJust $ e ^. result)
 applyAction :: LAction -> [LSubject]-> [LSubject]
 applyAction (RemSub i) s 	= ys ++ tail zs where (ys,zs) = splitAt i s
 applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
-applyAction (AddSub n) s 	= s ++ [n]
-applyAction (AddRes i r) s 	= s & ix i . result .~ Just r
-applyAction _ s= s
+applyAction (AddSub (Just n)) s 	= s ++ [n]
+applyAction (AddRes i (Just r)) s 	= s & ix i . result .~ Just r
+applyAction _ s = s
+-- applyAction _ s= s
 	
 -- Some data to demonstrante how it works.
 so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexner")(createSubject 2 1 "Sophomore" SE) 
@@ -200,7 +211,7 @@ outputNewState (w,io) = do
 	getBody w	UI.# set UI.children [view]
 
 -- | Returns result from the form elements
-getResult :: (Element, Element, Element) -> UI LResult
+getResult :: (Element, Element, Element) -> UI (Maybe LResult)
 getResult (di,pi,gi) = do
 	d <- di UI.# UI.get value
 	g <- gi UI.# UI.get value
@@ -208,7 +219,7 @@ getResult (di,pi,gi) = do
 	return $ createResult' d g p
 
 -- | Returns subject from the form elements
-getSubject :: (Element, Element, Element) -> UI LSubject
+getSubject :: (Element, Element, Element) -> UI (Maybe LSubject)	
 getSubject (ei,ti,ni) = do
 	e <- ei UI.# UI.get value
 	t <- ti UI.# UI.get value
