@@ -122,18 +122,16 @@
 	width: 29px;
 	left: 56px;
 }
-.iname{
-	width: 278px;
-}
 .iects{
 	width: 30px;
 }
 .igrade{
 	width: 20px;
-	top: 4px;
+	top: 0px;
 	right: 0px;
 	font-size: 18pt;
 	padding-left: 3pt;
+	height: 33px;
 }
 
 .idate{

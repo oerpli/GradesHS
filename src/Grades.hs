@@ -102,7 +102,6 @@ applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
 applyAction (AddSub (Just n)) s 	= s ++ [n]
 applyAction (AddRes i (Just r)) s 	= s & ix i . result .~ Just r
 applyAction _ s = s
--- applyAction _ s= s
 	
 -- Some data to demonstrante how it works.
 so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexner")(createSubject 2 1 "Sophomore" SE) 
@@ -184,7 +183,9 @@ mkButtons (w,io) index su = do
 	on UI.click brem $ \_ -> do
 		if isnew then do
 			subj<- getSubject (e,t,n)
+			res	<- getResult (d,p,g)
 			liftIO $ modifyIORef io (applyAction (AddSub subj))
+			liftIO $ modifyIORef io (applyAction (AddRes index res))		
 		else
 			liftIO $ modifyIORef io (applyAction (RemSub index))
 		outputNewState (w,io)
@@ -198,7 +199,7 @@ mkButtons (w,io) index su = do
 		outputNewState (w,io)
 	let out = arbitraryName where
 		arbitraryName
-			| isnew = brem :[e,t,n]
+			| isnew = brem :[e,t,n,d,p,g]
 			| graded = [brem,bres]
 			| otherwise = [brem,bres] ++ [d,p,g]
 	return out where
