@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction, RecursiveDo #-}
 -- module GradesHS where
 
+import	Data.List
 import	GradesTypes
 import	Text.Printf
 import	Data.Time
@@ -17,12 +18,13 @@ import qualified Graphics.UI.Threepenny as UI
 
 -- | Different average calculations. NN indicates that negative should be ignored.
 data LAvg = SWS | ECTS | UW | NN LAvg deriving (Eq,Ord) 		
-
+data SortCriteria = SDate | SEcts | SGrade | SType | SName deriving (Eq)
 -- | Available actions from the interface
 data LAction = 	RemSub Int			-- remove subject with index 		
 			|	RemRes Int			-- remove result from subject with index
 			|	AddRes Int (Maybe LResult)	-- add result to index
 			|	AddSub (Maybe LSubject)		-- add subject
+			|	Sort SortCriteria	-- sort according to critera
 			-- |	DoNothing			-- in case of failure
 
 makeClassy ''LSubject
@@ -101,7 +103,30 @@ applyAction (RemSub i) s 	= ys ++ tail zs where (ys,zs) = splitAt i s
 applyAction (RemRes i) s 	= s & ix i . result .~ Nothing
 applyAction (AddSub (Just n)) s 	= s ++ [n]
 applyAction (AddRes i (Just r)) s 	= s & ix i . result .~ Just r
+applyAction (Sort SEcts) s	= sortBy  sortECTS s
+applyAction (Sort SGrade)s	= sortBy  sortGrade s
+applyAction (Sort SDate) s	= sortBy  sortDate s
 applyAction _ s = s
+
+sortECTS :: LSubject -> LSubject -> Ordering
+sortECTS a b = compare (b^.ects) (a^.ects)
+
+sortDate :: LSubject -> LSubject -> Ordering
+sortDate a b = ord br ar where
+	ar = a^.result
+	br = b^.result
+	ord (Just x) (Just y) = compare (x^.date) (y^.date)
+	ord (Just _) Nothing = GT
+	ord Nothing _ = LT
+	
+sortGrade :: LSubject -> LSubject -> Ordering
+sortGrade a b = ord ar br where
+	ar = a^.result
+	br = b^.result
+	ord (Just x) (Just y) = compare (x^.grade) (y^.grade)
+	ord (Just _) Nothing = GT
+	ord Nothing _ = LT	
+	
 	
 -- Some data to demonstrante how it works.
 so = addResult (createResult (10,12,2013) (G "+") "Univ.-Prof Dr. Gerhard Krexner")(createSubject 2 1 "Sophomore" SE) 
@@ -110,12 +135,23 @@ e4 = addResult (createResult (19,02,2014) (AT G4) "Prof. iR Dr. Wolfgang Pfeiler
 cp = addResult (createResult (26,03,2014) (AT S1) "Univ.-Prof Dr. Martin Neumann")(createSubject 5 1 "Computational Physics" VO)
 cp2 = createSubject 5 1 "Computational Physics II" VO
 stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
-std = map Just [cp,e3,e4,stat,so,cp2] ++ [Nothing]
+std =  [cp,e3,e4,stat,so,cp2]
 
 
+{- internal stuff - should not be exposed to the user -}
+instance Show LResult where
+	show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
+
+instance Show LSubject where
+	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.name) ++ "\t(" ++ show (s^.ects) ++ ")"
+		++  maybe "" ((":\t" ++) . show) (s^.result) where
+fillTo :: Int -> String -> String
+fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
+
+standard = map Just std ++ [Nothing]
 -- GUI (ugly code starts here)
 main :: IO ()
-main = startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup std)
+main = startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup standard)
 	
 setup :: [Maybe LSubject] -> Window -> UI ()
 setup s w = void $ do
@@ -133,7 +169,29 @@ mkView w s = do
 
 -- | Subject list
 mkSubjects  :: (Window,IORef [LSubject]) -> [Maybe LSubject] -> UI Element
-mkSubjects w s = UI.div #. "subjects" #+ (UI.h2 UI.# set text "Subjects":iterateWithIndex 0 (mkSubject w) s)
+mkSubjects w s =
+	UI.div #. "subjects" #+ (UI.h2 UI.# set text "Subjects"
+		#+ [mkSorts w]
+	: iterateWithIndex 0 (mkSubject w) s)
+
+-- mkSorts :: (Window, IORef [LSubject]) -> UI [Element]
+mkSorts (w,io) = do
+	e	<-	UI.button #+ [string "ECTS"]
+	d	<- 	UI.button #+ [string "Date"]
+	g	<-	UI.button #+ [string "Grade"]
+	on UI.click e $ \_ -> do
+		liftIO $ modifyIORef io (applyAction (Sort SEcts))
+		outputNewState (w,io)
+	on UI.click d $ \_ -> do
+		liftIO $ modifyIORef io (applyAction (Sort SDate))
+		outputNewState (w,io)
+	on UI.click g $ \_ -> do
+		liftIO $ modifyIORef io (applyAction (Sort SGrade))
+		outputNewState (w,io)
+	UI.span UI.# set UI.children [e,d,g]
+	
+			
+	
 
 -- | Entry in subject list
 mkSubject :: (Window,IORef [LSubject])-> Int -> Maybe LSubject -> UI Element
@@ -158,8 +216,8 @@ mkButtons :: (Window,IORef [LSubject])-> Int -> Maybe LSubject -> UI [Element]
 mkButtons (w,io) index su = do
 	let isnew = isNothing su
 	let graded	= isJust $ fromMaybe def su ^.result
-	brem	<- UI.button#. ("sb1 " ++ show index)	#+ [string $ if isnew then "+" else "-"]
-	bres	<- UI.button#. ("sb2 " ++ show index)	#+ [string $ if graded then "-" else "+"]
+	brem	<- UI.button #. "sb1 "	#+ [string $ if isnew then "+" else "-"]
+	bres	<- UI.button #. "sb2 "	#+ [string $ if graded then "-" else "+"]
 
 	-- create subject 
 	e	<- UI.input #. "input iects"

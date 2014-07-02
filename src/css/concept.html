@@ -1,75 +1,82 @@
 <head>
-  <title>GradesHS</title>
-  <script src="driver/threepenny-gui.js"></script>
-  <link rel="stylesheet" type="text/css" href="./concept.css"/></head>
+	<title>Grades.HS</title>
+	<link href="concept.css" type="text/css" rel="stylesheet">
+</head>
 <body>
-  <noscript>Please enable JavaScript.</noscript>
-
-
-<div class="wrap">
-<h1><span>Grades.HS</span></h1>
-<div class="subjects">
-<h2><span>Subjects</span></h2>
-<div class="subject pos">
-	<button class="sb1">-</button>
-	<button class="sb2">R</button>
-	<div class=title">
-		<div class="ects">5.0</div>
-		<div class="type">UE</div>
-		<div class="name">Computational Physics II</div>
+	<div class="main">
+		<h1><span>Grades.HS</span></h1>
+		<div class="subjects">
+			<h2>Subjects 
+			<button >ECTS</button>
+			<button >Date</button>
+			<button >Grade</button>
+			</h2>
+			
+			
+			<div class="subject pos">
+				<div class="title">
+					<div class="ects"><span>5.0</span></div>
+					<div class="type"><span>VO</span></div>
+					<div class="name"><span>Computational Physics</span></div>
+				</div>
+				<div class="grade"><span>1</span></div>
+				<div class="exam">
+					<div class="date"><span>2014-03-26</span></div>
+					<div class="prof"><span>Univ.-Prof Dr. Martin Neumann</span></div>
+				</div>
+				<button class="sb1 0"><span>-</span></button><button class="sb2 0"><span>-</span></button>
+			</div>
+			<div class="subject neg">
+				<div class="title">
+					<div class="ects"><span>3.0</span></div>
+					<div class="type"><span>VO</span></div>
+					<div class="name"><span>Statistik und Wahrscheinlichkeitstheorie</span></div>
+				</div>
+				<div class="grade"><span>5</span></div>
+				<div class="exam">
+					<div class="date"><span>2014-03-03</span></div>
+					<div class="prof"><span>Univ.-Prof Dr. Reinhard Viertl</span></div>
+				</div>
+				<button class="sb1 1"><span>-</span></button><button class="sb2 1"><span>-</span></button>
+			</div>
+			<div class="subject todo">
+				<div class="title">
+					<div class="ects"><span>5.0</span></div>
+					<div class="type"><span>VO</span></div>
+					<div class="name"><span>Computational Physics II</span></div>
+				</div>
+				<div class="grade"><span></span></div>
+				<div class="exam">
+					<div class="date"><span></span></div>
+					<div class="prof"><span></span></div>
+				</div>
+				<button class="sb1 2"><span>-</span></button><button class="sb2 2"><span>+</span></button><input pattern="[0-9]{4}[-][0-9]{2}[-][0-9]{2}" placeholder="4Y-2M-2D" class="input2 idate"><input placeholder="Examinant" class="input2 iprof"><input pattern="[1|2|3|4|5|+|-]" placeholder="G" class="input2 igrade">
+			</div>
+			<div class="subject new">
+			<button class="sb1 3"><span>+</span></button>
+			<input pattern="[0-9]+[.]?[0-9]?" placeholder="ECTS" class="input iects">
+			<input pattern="(?i)VU|VO|SE|PR|LU|UE" placeholder="Type" class="input itype">
+			<input placeholder="Subject" class="input iname">
+			<input pattern="[0-9]{4}[-][0-9]{2}[-][0-9]{2}" placeholder="4Y-2M-2D" class="input2 idate">
+			<input placeholder="Examinant" class="input2 iprof"><input pattern="[1|2|3|4|5|+|-]" placeholder="G" class="input2 igrade"></div>
+		</div>
+		<div class="stats">
+			<h2>Statistics</h2>
+			<div class="statwrap">
+				<div class="statline"><span class="label h5">ECTS</span><span class="value"></span></div>
+				<div class="statline"><span class="label">Total:</span><span class="value">13.0</span></div>
+				<div class="statline"><span class="label">Positive:</span><span class="value">5.0</span></div>
+				<div class="statline"><span class="label">Remaining:</span><span class="value">8.0</span></div>
+				<div class="statline"><span class="label h5">Averages</span><span class="value"></span></div>
+				<div class="statline"><span class="label">ECTS:</span><span class="value">2.50</span></div>
+				<div class="statline"><span class="label">ECTS (positive):</span><span class="value">1.00</span></div>
+				<div class="statline"><span class="label">Unweighted:</span><span class="value">3.00</span></div>
+				<div class="statline"><span class="label">Unweighted (positive):</span><span class="value">1.00</span></div>
+				<div class="statline"><span class="label h5">Subjects</span><span class="value"></span></div>
+				<div class="statline"><span class="label">Total:</span><span class="value">3</span></div>
+				<div class="statline"><span class="label">Positive:</span><span class="value">1</span></div>
+				<div class="statline"><span class="label">Negative:</span><span class="value">1</span></div>
+			</div>
+		</div>
 	</div>
-	<div class="grade">1</div>
-	<div class="exam">
-		<span class="date">23-05-2014</span>
-		<span class="prof">Dr. Martin Neumann</span>
-	</div>		
-
-</div>
-<div class="subject todo">
-	<button class="sbutton sb1">-</button>
-	<button class="sbutton sb2">+</button>
-	<span class=title">
-		<span class="ects">6.0</span>
-		<span class="type">VO</span>
-		<span class="name">Einführung in die Physik III</span>
-	</span>
-	<div class="inputs">
-		<input class="input2 idate" type="text" pattern="[0-9]+[-][0-9]+[-][0-9]+" />
-		<input class="input2 iprof" type="text" placeholder="Prof.">
-		<input class="input2 igrade" type="text" pattern="1|2|3|4|5" >
-	</div>
-</div>
-<div class="subject neg">
-	<button class="sbutton sb1">-</button>
-	<button class="sbutton sb2">R</button>
-	<span class=title">
-		<span class="ects">10.0</span>
-		<span class="type">VO</span>
-		<span class="name">Statistik und Wahrscheinlichkeitstheorie</span>
-	</span>
-	<div class="grade">5</div>
-	<div class="exam">
-		<span class="date">23-05-2014</span>
-		<span class="prof">Prof. Viertl</span>
-	</div>
-</div>
-<div class="subject new">
-	<div class="inputs">
-		<input class="input iects" type="text" pattern="[0-9]*[.|,]?[0-9]?" />
-		<input class="input itype" type="text" pattern="VO|UE|SE|PR" >
-		<input class="input iname" type="text">
-	</div>
-	<button class="sbutton sb1">+</button>
-</div>
-</div>
-
-<div class="stats">
-<h2><span>Statistics</span></h2>
-<div class="statwrap">
-	<div class="statline"><span class="label h5">ECTS</span><span class="value"></span></div>
-	<div class="statline"><span class="label">Total:</span><span class="value">27.00</span></div>
-	<div class="statline"><span class="label">Positive:</span><span class="value">19.00</span></div>
-	<div class="statline"><span class="label">Remaining:</span><span class="value">8.00</span></div>
-</div>
-</div>
-
+</body>

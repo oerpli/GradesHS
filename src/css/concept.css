@@ -138,6 +138,9 @@
 	width: 65px;
 }
 
+.sorts{
+	background: #0AC;
+}
 
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
