@@ -145,7 +145,7 @@ main = startGUI defaultConfig {tpPort = Just 9999, tpStatic = Just "./" } (setup
 setup :: [Maybe LSubject] -> Window -> UI ()
 setup s w = void $ do
 	return w UI.# set title "Grades.HS"
-	UI.addStyleSheet w "concept.css"
+	UI.addStyleSheet w "grades.css"
 	io <- liftIO $ newIORef (catMaybes s)
 	view	<- mkView (w,io) s
 	getBody w	UI.# set UI.children [view]
@@ -206,21 +206,21 @@ mkButtons :: (Window,IORef [LSubject])-> Int -> Maybe LSubject -> UI [Element]
 mkButtons (w,io) index su = do
 	let isnew = isNothing su
 	let graded	= isJust $ fromMaybe def su ^.result
-	brem	<- UI.button #. "sb1 "	#+ [string $ if isnew then "+" else "-"]
-	bres	<- UI.button #. "sb2 "	#+ [string $ if graded then "-" else "+"]
+	subjb	<- UI.button #. "sb1 "	#+ [string $ if isnew then "+" else "-"]
+	resb	<- UI.button #. "sb2 "	#+ [string $ if graded then "-" else "+"]
 
 	-- create subject 
 	e	<- UI.input #. "input iects"
 			UI.# set (attr "placeholder") "ECTS"
 			UI.# set (attr "pattern")"[0-9]+[.]?[0-9]?"	
 	t	<- UI.input #. "input itype"
+			UI.# set (attr "pattern") "VU|VO|SE|PR|LU|UE" --only on clientside. if you want to enter garbage the server allows it.
 			UI.# set (attr "placeholder") "Type"
-			UI.# set (attr "pattern")"(?i)VU|VO|SE|PR|LU|UE"
 	n	<- UI.input #. "input iname"
 			UI.# set (attr "placeholder") "Subject"
 	-- create exam (result)
 	d	<- UI.input #. "input2 idate"
-			UI.# set (attr "placeholder") "4Y-2M-2D"
+			UI.# set (attr "placeholder") "YYYY-MM-DD"
 			UI.# set (attr "pattern")"[0-9]{4}[-][0-9]{2}[-][0-9]{2}"	
 	p	<- UI.input #. "input2 iprof"
 			UI.# set (attr "placeholder") "Examinant"
@@ -228,28 +228,34 @@ mkButtons (w,io) index su = do
 			UI.# set (attr "placeholder")  "G"
 			UI.# set (attr "pattern")"[1|2|3|4|5|+|-]"	
 	
-	on UI.click brem $ \_ -> do
+	on UI.click subjb $ \_ -> do
 		if isnew then do
 			subj<- getSubject (e,t,n)
 			res	<- getResult (d,p,g)
 			liftIO $ modifyIORef io (applyAction (AddSub subj))
-			liftIO $ modifyIORef io (applyAction (AddRes index res))		
-		else
+			liftIO $ modifyIORef io (applyAction (AddRes index res))
+			if isJust subj then 
+				outputNewState (w,io)
+			else UI.div -- this does nothing really. only provides the same type as outputNewState
+		else do
 			liftIO $ modifyIORef io (applyAction (RemSub index))
-		outputNewState (w,io)
+			outputNewState (w,io)
 
-	on UI.click bres $ \_ -> do
-		if graded then
+	on UI.click resb $ \_ -> do
+		if graded then do
 			liftIO $ modifyIORef io (applyAction (RemRes index))
+			outputNewState (w,io)
 		else do
 			res	<- getResult (d,p,g)
 			liftIO $ modifyIORef io (applyAction (AddRes index res))		
-		outputNewState (w,io)
+			if isJust res then
+				outputNewState (w,io)
+			else UI.div -- this does nothing really. only provides the same type as outputNewState
 	let out = arbitraryName where
 		arbitraryName
-			| isnew = brem :[e,t,n,d,p,g]
-			| graded = [brem,bres]
-			| otherwise = [brem,bres] ++ [d,p,g]
+			| isnew = [e,t,n,d,p,g,subjb]
+			| graded = [subjb,resb]
+			| otherwise = [subjb,d,p,g,resb]
 	return out where
 
 -- | Renders the current content of the IORef in the specified window
