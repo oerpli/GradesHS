@@ -137,17 +137,6 @@ cp2 = createSubject 5 1 "Computational Physics II" VO
 stat = addResult (createResult (3,03,2014) (AT N5) "Univ.-Prof Dr. Reinhard Viertl") (createSubject  3 1   "Statistik und Wahrscheinlichkeitstheorie" VO)
 std =  [cp,e3,e4,stat,so,cp2]
 
-
-{- internal stuff - should not be exposed to the user -}
-instance Show LResult where
-	show r = "   " ++ (show (r^.grade)) ++ ", "  ++ (show (r^.date)) ++ " " ++ (r^.prof)
-
-instance Show LSubject where
-	show s = fillTo 5 (show (s^.ltype)) ++ "| " ++ fillTo 10 (s^.name) ++ "\t(" ++ show (s^.ects) ++ ")"
-		++  maybe "" ((":\t" ++) . show) (s^.result) where
-fillTo :: Int -> String -> String
-fillTo n s = (take n s) ++ take (n-(length s)) (repeat ' ')
-
 standard = map Just std ++ [Nothing]
 -- GUI (ugly code starts here)
 main :: IO ()
