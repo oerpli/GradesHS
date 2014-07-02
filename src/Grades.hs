@@ -124,8 +124,8 @@ sortGrade a b = ord ar br where
 	ar = a^.result
 	br = b^.result
 	ord (Just x) (Just y) = compare (x^.grade) (y^.grade)
-	ord (Just _) Nothing = GT
-	ord Nothing _ = LT	
+	ord (Just _) Nothing = LT
+	ord Nothing _ = GT
 	
 	
 -- Some data to demonstrante how it works.
@@ -165,9 +165,10 @@ mkSubjects w s =
 
 -- mkSorts :: (Window, IORef [LSubject]) -> UI [Element]
 mkSorts (w,io) = do
-	e	<-	UI.button #+ [string "ECTS"]
-	d	<- 	UI.button #+ [string "Date"]
-	g	<-	UI.button #+ [string "Grade"]
+	s	<-	UI.span  UI.# set text "sort by: " #. "sorts stext"
+	e	<-	UI.button #. "sorts sects" #+ [string "ECTS"]
+	d	<- 	UI.button #. "sorts sdate" #+ [string "Date"]
+	g	<-	UI.button #. "sorts sgrade" #+ [string "Grade"]
 	on UI.click e $ \_ -> do
 		liftIO $ modifyIORef io (applyAction (Sort SEcts))
 		outputNewState (w,io)
@@ -177,7 +178,7 @@ mkSorts (w,io) = do
 	on UI.click g $ \_ -> do
 		liftIO $ modifyIORef io (applyAction (Sort SGrade))
 		outputNewState (w,io)
-	UI.span UI.# set UI.children [e,d,g]
+	UI.span UI.# set UI.children [g,d,e,s]
 	
 			
 	

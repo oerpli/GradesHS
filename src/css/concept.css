@@ -139,7 +139,9 @@
 }
 
 .sorts{
-	background: #0AC;
+	float: right;
+	text-decoration: none;
+	font-size: 12pt;
 }
 
 input[type=number]::-webkit-inner-spin-button, 
